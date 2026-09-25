@@ -1,4 +1,4 @@
-name: Build DJ Video Mixer App
+name: Build Pro DJ Video Mixer
 
 on:
   workflow_dispatch:
@@ -9,65 +9,63 @@ permissions:
   contents: write
 
 jobs:
-  build-app:
+  build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Create directory structure
+      - name: Create multi-module directory structure
         run: |
-          mkdir -p app/src/main/java/com/example/djvideomixer
+          mkdir -p app/src/main/java/com/djpro/mixer
           mkdir -p app/src/main/res/values
-          mkdir -p app/src/main/res/xml
+          mkdir -p core-audio/src/main/java/com/djpro/audio
+          mkdir -p core-dsp/src/main/java/com/djpro/dsp
+          mkdir -p core-stems/src/main/java/com/djpro/stems
+          mkdir -p core-stems/src/main/cpp
+          mkdir -p core-video/src/main/java/com/djpro/video
+          mkdir -p core-db/src/main/java/com/djpro/db
+          mkdir -p native/src/main/cpp/oboe
+          mkdir -p native/src/main/cpp/demucs
           mkdir -p gradle/wrapper
 
-      # ---------- ROOT GRADLE FILES ----------
-
-      - name: Write settings.gradle.kts
+      - name: Root gradle files
         run: |
           cat > settings.gradle.kts << 'EOF'
           pluginManagement {
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
-              }
+              repositories { google(); mavenCentral(); gradlePluginPortal() }
           }
           dependencyResolutionManagement {
               repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-              repositories {
-                  google()
-                  mavenCentral()
-              }
+              repositories { google(); mavenCentral() }
           }
-          rootProject.name = "DJVideoMixer"
+          rootProject.name = "DJVideoMixerPro"
           include(":app")
+          include(":core-audio")
+          include(":core-dsp")
+          include(":core-stems")
+          include(":core-video")
+          include(":core-db")
+          include(":native")
           EOF
 
-      - name: Write root build.gradle.kts
-        run: |
           cat > build.gradle.kts << 'EOF'
           plugins {
               id("com.android.application") version "8.5.2" apply false
+              id("com.android.library") version "8.5.2" apply false
               id("org.jetbrains.kotlin.android") version "1.9.24" apply false
           }
           EOF
 
-      - name: Write gradle.properties
-        run: |
           cat > gradle.properties << 'EOF'
-          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          org.gradle.jvmargs=-Xmx4096m
           android.useAndroidX=true
           kotlin.code.style=official
           android.nonTransitiveRClass=true
+          android.defaultConfig.ndk.abiFilters=arm64-v8a
           EOF
 
-      - name: Write gradle-wrapper.properties
-        run: |
           cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
           distributionBase=GRADLE_USER_HOME
           distributionPath=wrapper/dists
@@ -76,68 +74,728 @@ jobs:
           zipStorePath=wrapper/dists
           EOF
 
-      - name: Setup Gradle
+      - name: Setup Gradle and generate wrapper
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: 8.7
+      - run: gradle wrapper --gradle-version 8.7
 
-      - name: Generate Gradle wrapper
-        run: gradle wrapper --gradle-version 8.7
+      # ==================== NATIVE MODULE (Oboe + Demucs) ====================
 
-      # ---------- APP MODULE ----------
+      - name: native/build.gradle.kts
+        run: |
+          cat > native/build.gradle.kts << 'EOF'
+          plugins {
+              id("com.android.library")
+              id("org.jetbrains.kotlin.android")
+          }
+          android {
+              namespace = "com.djpro.native"
+              compileSdk = 34
+              ndkVersion = "26.1.10909125"
+              defaultConfig {
+                  minSdk = 26
+                  externalNativeBuild {
+                      cmake {
+                          cppFlags += "-std=c++17"
+                          arguments += "-DANDROID_STL=c++_shared"
+                      }
+                  }
+              }
+              externalNativeBuild {
+                  cmake {
+                      path = file("src/main/cpp/CMakeLists.txt")
+                      version = "3.22.1"
+                  }
+              }
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+              kotlinOptions { jvmTarget = "17" }
+          }
+          dependencies {
+              implementation("androidx.core:core-ktx:1.13.1")
+          }
+          EOF
 
-      - name: Write app/build.gradle.kts
+          cat > native/src/main/cpp/CMakeLists.txt << 'EOF'
+          cmake_minimum_required(VERSION 3.22.1)
+          project("djpro_native")
+
+          # Oboe – download at build time from GitHub releases
+          include(FetchContent)
+          FetchContent_Declare(
+              oboe
+              GIT_REPOSITORY https://github.com/google/oboe.git
+              GIT_TAG 1.9.0
+          )
+          FetchContent_MakeAvailable(oboe)
+
+          add_library(djpro_native SHARED
+              oboe/OboeEngine.cpp
+              demucs/DemucsBridge.cpp
+          )
+
+          target_link_libraries(djpro_native
+              oboe::oboe
+              android
+              log
+          )
+          EOF
+
+      - name: native OboeEngine.cpp
+        run: |
+          cat > native/src/main/cpp/oboe/OboeEngine.cpp << 'EOF'
+          #include <oboe/Oboe.h>
+          #include <android/log.h>
+          #include <cmath>
+          #include <vector>
+          #include <mutex>
+
+          #define LOG_TAG "DJProOboe"
+          #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+
+          class OboeEngine : public oboe::AudioStreamDataCallback,
+                             public oboe::AudioStreamErrorCallback {
+          public:
+              oboe::DataCallbackResult onAudioReady(
+                  oboe::AudioStream *stream, void *audioData, int32_t numFrames) override {
+                  float *out = static_cast<float*>(audioData);
+                  int ch = stream->getChannelCount();
+                  std::lock_guard<std::mutex> lock(mMutex);
+                  // Mix up to 6 deck buffers
+                  for (int i = 0; i < numFrames * ch; ++i) out[i] = 0.0f;
+                  for (auto &deck : mDecks) {
+                      if (!deck.active) continue;
+                      for (int i = 0; i < numFrames; ++i) {
+                          if (deck.pos >= deck.buffer.size()) { deck.active = false; break; }
+                          float s = deck.buffer[deck.pos++] * deck.volume;
+                          for (int c = 0; c < ch; ++c) out[i*ch + c] += s;
+                      }
+                  }
+                  for (int i = 0; i < numFrames * ch; ++i)
+                      out[i] = std::tanh(out[i]);  // soft clip
+                  return oboe::DataCallbackResult::Continue;
+              }
+
+              void onErrorAfterClose(oboe::AudioStream*, oboe::Result) override {
+                  LOGI("Stream error, restarting");
+                  start();
+              }
+
+              bool start() {
+                  oboe::AudioStreamBuilder b;
+                  b.setDirection(oboe::Direction::Output);
+                  b.setPerformanceMode(oboe::PerformanceMode::LowLatency);
+                  b.setSharingMode(oboe::SharingMode::Exclusive);
+                  b.setFormat(oboe::AudioFormat::Float);
+                  b.setChannelCount(oboe::ChannelCount::Stereo);
+                  b.setSampleRate(48000);
+                  b.setDataCallback(this);
+                  b.setErrorCallback(this);
+                  oboe::Result r = b.openStream(mStream);
+                  if (r != oboe::Result::OK) return false;
+                  mStream->requestStart();
+                  return true;
+              }
+
+              void stop() { if (mStream) { mStream->requestStop(); mStream->close(); } }
+
+              struct Deck { std::vector<float> buffer; size_t pos = 0; float volume = 1.0f; bool active = false; };
+
+              void loadDeck(int id, const float* data, size_t n, float vol) {
+                  std::lock_guard<std::mutex> lock(mMutex);
+                  if (id >= (int)mDecks.size()) mDecks.resize(id+1);
+                  mDecks[id].buffer.assign(data, data+n);
+                  mDecks[id].pos = 0; mDecks[id].volume = vol; mDecks[id].active = true;
+              }
+
+              void setDeckVolume(int id, float v) {
+                  std::lock_guard<std::mutex> lock(mMutex);
+                  if (id < (int)mDecks.size()) mDecks[id].volume = v;
+              }
+
+              void scratchDeck(int id, float rate) {
+                  std::lock_guard<std::mutex> lock(mMutex);
+                  if (id < (int)mDecks.size()) {
+                      // rate<1 = slower, rate>1 = faster; pos advance is controlled per callback
+                      mDecks[id].volume = std::abs(rate);
+                  }
+              }
+
+          private:
+              std::shared_ptr<oboe::AudioStream> mStream;
+              std::vector<Deck> mDecks;
+              std::mutex mMutex;
+          };
+
+          static OboeEngine* gEngine = nullptr;
+
+          extern "C" {
+              JNIEXPORT jboolean JNICALL
+              Java_com_djpro_native_NativeBridge_startEngine(JNIEnv*, jobject) {
+                  if (!gEngine) gEngine = new OboeEngine();
+                  return gEngine->start();
+              }
+              JNIEXPORT void JNICALL
+              Java_com_djpro_native_NativeBridge_stopEngine(JNIEnv*, jobject) {
+                  if (gEngine) { gEngine->stop(); delete gEngine; gEngine = nullptr; }
+              }
+              JNIEXPORT void JNICALL
+              Java_com_djpro_native_NativeBridge_loadDeck(JNIEnv* env, jobject,
+                                                          jint id, jfloatArray data, jfloat vol) {
+                  jsize n = env->GetArrayLength(data);
+                  jfloat* buf = env->GetFloatArrayElements(data, nullptr);
+                  if (gEngine) gEngine->loadDeck(id, buf, n, vol);
+                  env->ReleaseFloatArrayElements(data, buf, 0);
+              }
+              JNIEXPORT void JNICALL
+              Java_com_djpro_native_NativeBridge_setDeckVolume(JNIEnv*, jobject, jint id, jfloat v) {
+                  if (gEngine) gEngine->setDeckVolume(id, v);
+              }
+          }
+          EOF
+
+      - name: native DemucsBridge.cpp
+        run: |
+          cat > native/src/main/cpp/demucs/DemucsBridge.cpp << 'EOF'
+          // Placeholder for Demucs NDK integration.
+          // Real implementation: build demucs.cpp from source and link htdemucs model.
+          // See https://github.com/sevagh/demucs.cpp for reference.
+          #include <jni.h>
+          #include <android/log.h>
+
+          #define LOG_TAG "DJProDemucs"
+          #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+
+          extern "C" {
+              JNIEXPORT jboolean JNICALL
+              Java_com_djpro_native_DemucsBridge_isModelReady(JNIEnv*, jobject) {
+                  return false;  // flip to true once model is bundled
+              }
+              JNIEXPORT jstring JNICALL
+              Java_com_djpro_native_DemucsBridge_separate(JNIEnv* env, jobject, jstring path) {
+                  LOGI("Stem separation stub called");
+                  return env->NewStringUTF("not_implemented");
+              }
+          }
+          EOF
+
+      - name: NativeBridge.kt
+        run: |
+          cat > native/src/main/java/com/djpro/native/NativeBridge.kt << 'EOF'
+          package com.djpro.native
+
+          object NativeBridge {
+              init { System.loadLibrary("djpro_native") }
+
+              external fun startEngine(): Boolean
+              external fun stopEngine()
+              external fun loadDeck(id: Int, data: FloatArray, volume: Float)
+              external fun setDeckVolume(id: Int, volume: Float)
+              external fun scratchDeck(id: Int, rate: Float)
+          }
+
+          object DemucsBridge {
+              external fun isModelReady(): Boolean
+              external fun separate(path: String): String
+          }
+          EOF
+
+      # ==================== CORE-AUDIO MODULE ====================
+
+      - name: core-audio/build.gradle.kts
+        run: |
+          cat > core-audio/build.gradle.kts << 'EOF'
+          plugins {
+              id("com.android.library")
+              id("org.jetbrains.kotlin.android")
+          }
+          android {
+              namespace = "com.djpro.audio"
+              compileSdk = 34
+              defaultConfig { minSdk = 26 }
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+              kotlinOptions { jvmTarget = "17" }
+          }
+          dependencies {
+              implementation(project(":native"))
+              implementation(project(":core-dsp"))
+              implementation("androidx.media3:media3-exoplayer:1.4.1")
+              implementation("androidx.media3:media3-common:1.4.1")
+              implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+          }
+          EOF
+
+      - name: SixDeckEngine.kt
+        run: |
+          cat > core-audio/src/main/java/com/djpro/audio/SixDeckEngine.kt << 'EOF'
+          package com.djpro.audio
+
+          import android.content.Context
+          import com.djpro.native.NativeBridge
+          import kotlin.math.cos
+          import kotlin.math.sin
+
+          /**
+           * 6-deck DJ engine. Decks 1 & 2 are the "main" decks (video-capable),
+           * decks 3-6 are sample/cue decks.
+           */
+          class SixDeckEngine(private val context: Context) {
+
+              data class DeckState(
+                  var loaded: Boolean = false,
+                  var volume: Float = 1.0f,
+                  var playing: Boolean = false,
+                  var cuePoint: Long = 0L,
+                  var stemsEnabled: Boolean = false,
+                  var muteVocals: Boolean = false,
+                  var muteDrums: Boolean = false,
+                  var muteBass: Boolean = false,
+                  var muteOther: Boolean = false,
+              )
+
+              val decks = MutableList(6) { DeckState() }
+              var crossfader: Float = 0.5f
+                  private set
+              var masterVolume: Float = 1.0f
+                  private set
+
+              init {
+                  NativeBridge.startEngine()
+              }
+
+              fun setCrossfader(v: Float) {
+                  crossfader = v.coerceIn(0f, 1f)
+                  // equal-power curve, decks 1 & 2
+                  val a = cos(crossfader * Math.PI / 2).toFloat()
+                  val b = sin(crossfader * Math.PI / 2).toFloat()
+                  NativeBridge.setDeckVolume(0, a * decks[0].volume)
+                  NativeBridge.setDeckVolume(1, b * decks[1].volume)
+              }
+
+              fun setMasterVolume(v: Float) {
+                  masterVolume = v.coerceIn(0f, 1f)
+                  for (i in 0 until 6) {
+                      NativeBridge.setDeckVolume(i, masterVolume * decks[i].volume)
+                  }
+              }
+
+              fun loadDeck(id: Int, samples: FloatArray, volume: Float = 1f) {
+                  decks[id].loaded = true
+                  decks[id].volume = volume
+                  NativeBridge.loadDeck(id, samples, volume * masterVolume)
+              }
+
+              fun setDeckVolume(id: Int, v: Float) {
+                  decks[id].volume = v.coerceIn(0f, 1f)
+                  NativeBridge.setDeckVolume(id, v * masterVolume)
+              }
+
+              fun scratch(id: Int, rate: Float) {
+                  NativeBridge.scratchDeck(id, rate)
+              }
+
+              fun toggleStem(id: Int, stem: String) {
+                  val d = decks[id]
+                  when (stem) {
+                      "vocals" -> d.muteVocals = !d.muteVocals
+                      "drums"  -> d.muteDrums = !d.muteDrums
+                      "bass"   -> d.muteBass = !d.muteBass
+                      "other"  -> d.muteOther = !d.muteOther
+                  }
+              }
+
+              fun release() {
+                  NativeBridge.stopEngine()
+              }
+          }
+          EOF
+
+      # ==================== CORE-DSP MODULE ====================
+
+      - name: core-dsp files
+        run: |
+          cat > core-dsp/build.gradle.kts << 'EOF'
+          plugins {
+              id("com.android.library")
+              id("org.jetbrains.kotlin.android")
+          }
+          android {
+              namespace = "com.djpro.dsp"
+              compileSdk = 34
+              defaultConfig { minSdk = 26 }
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+              kotlinOptions { jvmTarget = "17" }
+          }
+          EOF
+
+          cat > core-dsp/src/main/java/com/djpro/dsp/EffectChain.kt << 'EOF'
+          package com.djpro.dsp
+
+          /**
+           * Simple effect chain applied to a deck's audio before it's sent to the mixer.
+           * Real implementation would use Media3 AudioProcessor or Oboe-level DSP.
+           */
+          class EffectChain {
+              var echoMix: Float = 0f       // 0..1
+              var filterCutoff: Float = 1f  // 0..1, 1 = fully open
+              var flangerMix: Float = 0f
+              var reverbMix: Float = 0f
+              var delayTimeMs: Int = 280
+
+              fun apply(samples: FloatArray): FloatArray {
+                  var s = samples
+                  if (filterCutoff < 1f) s = lowPass(s, filterCutoff)
+                  if (echoMix > 0f) s = echo(s, echoMix)
+                  if (flangerMix > 0f) s = flanger(s, flangerMix)
+                  if (reverbMix > 0f) s = reverb(s, reverbMix)
+                  return s
+              }
+
+              private fun lowPass(input: FloatArray, cutoff: Float): FloatArray {
+                  val out = FloatArray(input.size)
+                  val alpha = cutoff.coerceIn(0.01f, 1f)
+                  var prev = 0f
+                  for (i in input.indices) {
+                      prev = alpha * input[i] + (1 - alpha) * prev
+                      out[i] = prev
+                  }
+                  return out
+              }
+
+              private fun echo(input: FloatArray, mix: Float): FloatArray {
+                  val delaySamples = (48000 * delayTimeMs / 1000f).toInt()
+                  val out = input.copyOf()
+                  for (i in delaySamples until input.size) {
+                      out[i] += input[i - delaySamples] * mix
+                  }
+                  return out
+              }
+
+              private fun flanger(input: FloatArray, mix: Float): FloatArray {
+                  val out = FloatArray(input.size)
+                  val lfoPeriod = 48000 / 2  // 0.5 Hz
+                  for (i in input.indices) {
+                      val mod = (Math.sin(2 * Math.PI * i / lfoPeriod) * 5).toInt()
+                      val idx = (i - mod).coerceAtLeast(0)
+                      out[i] = input[i] * (1 - mix) + input[idx] * mix
+                  }
+                  return out
+              }
+
+              private fun reverb(input: FloatArray, mix: Float): FloatArray {
+                  // Simple Schroeder-style reverb (3 combs)
+                  val combs = intArrayOf(1557, 1617, 1491)
+                  val out = input.copyOf()
+                  for (c in combs) {
+                      for (i in c until input.size) {
+                          out[i] += out[i - c] * mix * 0.3f
+                      }
+                  }
+                  return out
+              }
+          }
+          EOF
+
+      # ==================== CORE-STEMS MODULE ====================
+
+      - name: core-stems files
+        run: |
+          cat > core-stems/build.gradle.kts << 'EOF'
+          plugins {
+              id("com.android.library")
+              id("org.jetbrains.kotlin.android")
+          }
+          android {
+              namespace = "com.djpro.stems"
+              compileSdk = 34
+              defaultConfig { minSdk = 26 }
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+              kotlinOptions { jvmTarget = "17" }
+          }
+          dependencies {
+              implementation(project(":native"))
+              implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+          }
+          EOF
+
+          cat > core-stems/src/main/java/com/djpro/stems/StemSeparator.kt << 'EOF'
+          package com.djpro.stems
+
+          import android.content.Context
+          import com.djpro.native.DemucsBridge
+          import kotlinx.coroutines.Dispatchers
+          import kotlinx.coroutines.withContext
+          import java.io.File
+
+          /**
+           * Wraps Demucs 4-stem separation. On a real device this runs the
+           * htdemucs.cpp model via NDK. First-run downloads or bundles the model.
+           */
+          class StemSeparator(private val context: Context) {
+
+              data class Stems(
+                  val vocals: File,
+                  val drums: File,
+                  val bass: File,
+                  val other: File,
+              )
+
+              suspend fun separate(inputAudio: File): Stems = withContext(Dispatchers.Default) {
+                  if (!DemucsBridge.isModelReady()) {
+                      throw IllegalStateException(
+                          "Demucs model not bundled. Place htdemucs model in assets/ or " +
+                          "download on first run."
+                      )
+                  }
+                  val result = DemucsBridge.separate(inputAudio.absolutePath)
+                  val base = inputAudio.parentFile
+                  Stems(
+                      vocals = File(base, "vocals.wav"),
+                      drums  = File(base, "drums.wav"),
+                      bass   = File(base, "bass.wav"),
+                      other  = File(base, "other.wav"),
+                  )
+              }
+
+              /** Fallback: mid/side cancellation for instant (lower quality) vocal removal. */
+              fun quickVocalRemoval(input: FloatArray): FloatArray {
+                  // input is interleaved stereo
+                  val out = FloatArray(input.size)
+                  var i = 0
+                  while (i + 1 < input.size) {
+                      val l = input[i]; val r = input[i + 1]
+                      val side = (l - r) * 0.5f
+                      out[i]     = side * 2f
+                      out[i + 1] = -side * 2f
+                      i += 2
+                  }
+                  return out
+              }
+          }
+          EOF
+
+      # ==================== CORE-VIDEO MODULE ====================
+
+      - name: core-video files
+        run: |
+          cat > core-video/build.gradle.kts << 'EOF'
+          plugins {
+              id("com.android.library")
+              id("org.jetbrains.kotlin.android")
+          }
+          android {
+              namespace = "com.djpro.video"
+              compileSdk = 34
+              defaultConfig { minSdk = 26 }
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+              kotlinOptions { jvmTarget = "17" }
+          }
+          dependencies {
+              implementation("androidx.media3:media3-exoplayer:1.4.1")
+              implementation("androidx.media3:media3-ui:1.4.1")
+          }
+          EOF
+
+          cat > core-video/src/main/java/com/djpro/video/MixRecorder.kt << 'EOF'
+          package com.djpro.video
+
+          import android.app.Activity
+          import android.content.Context
+          import android.content.Intent
+          import android.hardware.display.DisplayManager
+          import android.hardware.display.VirtualDisplay
+          import android.media.MediaRecorder
+          import android.media.projection.MediaProjection
+          import android.media.projection.MediaProjectionManager
+          import android.os.Build
+          import android.os.Environment
+          import android.util.DisplayMetrics
+          import android.view.WindowManager
+          import java.io.File
+
+          /**
+           * Captures screen + audio to an MP4 using MediaProjection.
+           * Audio capture needs AudioPlaybackCaptureConfiguration on Android 10+.
+           */
+          class MixRecorder(private val context: Context) {
+
+              private var projection: MediaProjection? = null
+              private var virtualDisplay: VirtualDisplay? = null
+              private var recorder: MediaRecorder? = null
+              private var outputFile: File? = null
+
+              fun buildIntent(): Intent {
+                  val mgr = context.getSystemService(MediaProjectionManager::class.java)
+                  return mgr.createScreenCaptureIntent()
+              }
+
+              fun start(resultCode: Int, data: Intent) {
+                  val mgr = context.getSystemService(MediaProjectionManager::class.java)
+                  projection = mgr.getMediaProjection(resultCode, data)
+
+                  val metrics = DisplayMetrics()
+                  val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+                  @Suppress("DEPRECATION")
+                  wm.defaultDisplay.getRealMetrics(metrics)
+                  val w = metrics.widthPixels
+                  val h = metrics.heightPixels
+                  val dpi = metrics.densityDpi
+
+                  outputFile = File(
+                      Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
+                      "DJProMix_${System.currentTimeMillis()}.mp4"
+                  )
+
+                  recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                      MediaRecorder(context)
+                  } else {
+                      @Suppress("DEPRECATION") MediaRecorder()
+                  }.apply {
+                      setVideoSource(MediaRecorder.VideoSource.SURFACE)
+                      setAudioSource(MediaRecorder.AudioSource.MIC) // or REMOTE_SUBMIX on older
+                      setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                      setVideoEncoder(MediaRecorder.VideoEncoder.H264)
+                      setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                      setVideoSize(w, h)
+                      setVideoFrameRate(30)
+                      setVideoEncodingBitRate(8_000_000)
+                      setOutputFile(outputFile!!.absolutePath)
+                      prepare()
+                  }
+
+                  virtualDisplay = projection?.createVirtualDisplay(
+                      "DJProRec", w, h, dpi,
+                      DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                      recorder!!.surface, null, null
+                  )
+
+                  recorder?.start()
+              }
+
+              fun stop(): File? {
+                  try { recorder?.stop() } catch (_: Exception) {}
+                  recorder?.release(); recorder = null
+                  virtualDisplay?.release(); virtualDisplay = null
+                  projection?.stop(); projection = null
+                  return outputFile
+              }
+          }
+          EOF
+
+      # ==================== CORE-DB MODULE ====================
+
+      - name: core-db files
+        run: |
+          cat > core-db/build.gradle.kts << 'EOF'
+          plugins {
+              id("com.android.library")
+              id("org.jetbrains.kotlin.android")
+          }
+          android {
+              namespace = "com.djpro.db"
+              compileSdk = 34
+              defaultConfig { minSdk = 26 }
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+              kotlinOptions { jvmTarget = "17" }
+          }
+          dependencies {
+              implementation("androidx.room:room-runtime:2.6.1")
+              implementation("androidx.room:room-ktx:2.6.1")
+              implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+          }
+          EOF
+
+          cat > core-db/src/main/java/com/djpro/db/LibraryModels.kt << 'EOF'
+          package com.djpro.db
+
+          import androidx.room.Entity
+          import androidx.room.PrimaryKey
+
+          @Entity(tableName = "tracks")
+          data class TrackEntity(
+              @PrimaryKey(autoGenerate = true) val id: Long = 0,
+              val title: String,
+              val artist: String,
+              val uri: String,
+              val bpm: Float = 0f,
+              val keySignature: String = "",
+              val durationMs: Long = 0L,
+              val addedAt: Long = System.currentTimeMillis(),
+              val isVideo: Boolean = false,
+          )
+
+          @Entity(tableName = "playlists")
+          data class PlaylistEntity(
+              @PrimaryKey(autoGenerate = true) val id: Long = 0,
+              val name: String,
+              val createdAt: Long = System.currentTimeMillis(),
+          )
+
+          @Entity(tableName = "cues")
+          data class CueEntity(
+              @PrimaryKey(autoGenerate = true) val id: Long = 0,
+              val trackId: Long,
+              val positionMs: Long,
+              val label: String = "",
+              val colorHex: String = "#00E5FF",
+          )
+          EOF
+
+      # ==================== APP MODULE ====================
+
+      - name: app/build.gradle.kts
         run: |
           cat > app/build.gradle.kts << 'EOF'
           plugins {
               id("com.android.application")
               id("org.jetbrains.kotlin.android")
           }
-
           android {
-              namespace = "com.example.djvideomixer"
+              namespace = "com.djpro.mixer"
               compileSdk = 34
-
               defaultConfig {
-                  applicationId = "com.example.djvideomixer"
-                  minSdk = 24
+                  applicationId = "com.djpro.mixer"
+                  minSdk = 26
                   targetSdk = 34
                   versionCode = 1
-                  versionName = "1.0"
+                  versionName = "1.0.0-pro"
+                  ndk { abiFilters += "arm64-v8a" }
               }
-
-              buildTypes {
-                  release {
-                      isMinifyEnabled = false
-                  }
-              }
-
               compileOptions {
                   sourceCompatibility = JavaVersion.VERSION_17
                   targetCompatibility = JavaVersion.VERSION_17
               }
-
-              kotlinOptions {
-                  jvmTarget = "17"
-              }
-
-              buildFeatures {
-                  compose = true
-                  viewBinding = true
-              }
-
-              composeOptions {
-                  kotlinCompilerExtensionVersion = "1.5.14"
-              }
-
-              packaging {
-                  resources {
-                      excludes += "/META-INF/{AL2.0,LGPL2.1}"
-                  }
-              }
+              kotlinOptions { jvmTarget = "17" }
+              buildFeatures { compose = true }
+              composeOptions { kotlinCompilerExtensionVersion = "1.5.14" }
+              packaging { resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" } }
           }
-
           dependencies {
+              implementation(project(":core-audio"))
+              implementation(project(":core-dsp"))
+              implementation(project(":core-stems"))
+              implementation(project(":core-video"))
+              implementation(project(":core-db"))
+              implementation(project(":native"))
+
               implementation("androidx.core:core-ktx:1.13.1")
               implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
               implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
@@ -149,33 +807,27 @@ jobs:
               implementation("androidx.compose.material:material-icons-extended")
               implementation("androidx.media3:media3-exoplayer:1.4.1")
               implementation("androidx.media3:media3-ui:1.4.1")
-              implementation("androidx.media3:media3-common:1.4.1")
-              implementation("androidx.media3:media3-effect:1.4.1")
               implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
           }
           EOF
 
-      # ---------- MANIFEST ----------
-
-      - name: Write AndroidManifest.xml
+      - name: App manifest
         run: |
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-
               <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
               <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
-              <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
-                  android:maxSdkVersion="32" />
+              <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
               <uses-permission android:name="android.permission.RECORD_AUDIO" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
               <uses-permission android:name="android.permission.INTERNET" />
-
               <application
                   android:allowBackup="true"
-                  android:label="DJ Video Mixer"
-                  android:theme="@style/Theme.DJVideoMixer"
-                  android:supportsRtl="true">
-
+                  android:label="DJ Pro Mixer"
+                  android:largeHeap="true"
+                  android:theme="@style/Theme.DJPro">
                   <activity
                       android:name=".MainActivity"
                       android:exported="true"
@@ -190,483 +842,308 @@ jobs:
           </manifest>
           EOF
 
-      # ---------- RESOURCES ----------
-
-      - name: Write themes.xml
-        run: |
           cat > app/src/main/res/values/themes.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
-              <style name="Theme.DJVideoMixer" parent="android:Theme.Material.NoActionBar">
-                  <item name="android:statusBarColor">#000000</item>
-                  <item name="android:navigationBarColor">#000000</item>
-                  <item name="android:windowBackground">#000000</item>
+              <style name="Theme.DJPro" parent="android:Theme.Material.NoActionBar">
+                  <item name="android:windowBackground">#05050A</item>
               </style>
           </resources>
           EOF
 
-      - name: Write strings.xml
+      - name: MainActivity.kt
         run: |
-          cat > app/src/main/res/values/strings.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <string name="app_name">DJ Video Mixer</string>
-          </resources>
-          EOF
-
-      # ---------- KOTLIN SOURCE ----------
-
-      - name: Write MainActivity.kt
-        run: |
-          cat > app/src/main/java/com/example/djvideomixer/MainActivity.kt << 'EOF'
-          package com.example.djvideomixer
+          cat > app/src/main/java/com/djpro/mixer/MainActivity.kt << 'EOF'
+          package com.djpro.mixer
 
           import android.os.Bundle
           import androidx.activity.ComponentActivity
           import androidx.activity.compose.setContent
-          import androidx.activity.viewModels
-          import androidx.compose.foundation.layout.fillMaxSize
           import androidx.compose.material3.MaterialTheme
-          import androidx.compose.material3.Surface
+          import androidx.compose.ui.graphics.Color
+          import androidx.compose.foundation.background
+          import androidx.compose.foundation.layout.fillMaxSize
           import androidx.compose.ui.Modifier
+          import androidx.compose.foundation.layout.Box
 
           class MainActivity : ComponentActivity() {
-              private val viewModel: DJViewModel by viewModels()
-
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
                   setContent {
                       MaterialTheme {
-                          Surface(modifier = Modifier.fillMaxSize()) {
-                              DJScreen(viewModel)
+                          Box(
+                              modifier = Modifier
+                                  .fillMaxSize()
+                                  .background(Color(0xFF05050A))
+                          ) {
+                              SixDeckScreen()
                           }
                       }
                   }
               }
-
-              override fun onDestroy() {
-                  super.onDestroy()
-                  viewModel.release()
-              }
           }
           EOF
 
-      - name: Write Deck.kt
+      - name: NeonTheme.kt
         run: |
-          cat > app/src/main/java/com/example/djvideomixer/Deck.kt << 'EOF'
-          package com.example.djvideomixer
+          cat > app/src/main/java/com/djpro/mixer/NeonTheme.kt << 'EOF'
+          package com.djpro.mixer
 
-          import android.content.Context
-          import androidx.media3.common.MediaItem
-          import androidx.media3.common.Player
-          import androidx.media3.exoplayer.ExoPlayer
+          import androidx.compose.ui.graphics.Color
 
-          class Deck(val id: String, context: Context) {
-              val player: ExoPlayer = ExoPlayer.Builder(context).build().apply {
-                  repeatMode = Player.REPEAT_MODE_OFF
-                  playWhenReady = false
-              }
-
-              private var baseVolume: Float = 1f
-
-              fun load(uri: String) {
-                  player.setMediaItem(MediaItem.fromUri(uri))
-                  player.prepare()
-              }
-
-              fun play() = player.play()
-              fun pause() = player.pause()
-              fun toggle() { if (player.isPlaying) pause() else play() }
-
-              fun setVolume(v: Float) {
-                  baseVolume = v.coerceIn(0f, 1f)
-                  player.volume = baseVolume
-              }
-
-              fun scratchRate(rate: Float) {
-                  val clamped = rate.coerceIn(0.25f, 2.5f)
-                  player.setPlaybackSpeed(clamped)
-              }
-
-              fun resetRate() {
-                  player.setPlaybackSpeed(1f)
-              }
-
-              fun release() = player.release()
+          object Neon {
+              val BG = Color(0xFF05050A)
+              val PANEL = Color(0xFF0E0E16)
+              val PANEL_BORDER = Color(0xFF1E1E2E)
+              val CYAN = Color(0xFF00E5FF)
+              val MAGENTA = Color(0xFFFF2BD6)
+              val LIME = Color(0xFF9CFF2B)
+              val ORANGE = Color(0xFFFF8A00)
+              val PURPLE = Color(0xFF9C27FF)
+              val RED = Color(0xFFFF3B5C)
+              val TEXT = Color(0xFFE5E5F0)
+              val TEXT_DIM = Color(0x80E5E5F0)
           }
           EOF
 
-      - name: Write AudioEngine.kt
+      - name: SixDeckScreen.kt
         run: |
-          cat > app/src/main/java/com/example/djvideomixer/AudioEngine.kt << 'EOF'
-          package com.example.djvideomixer
-
-          import android.content.Context
-          import kotlin.math.cos
-          import kotlin.math.sin
-
-          class AudioEngine(context: Context) {
-              val deckA = Deck("A", context)
-              val deckB = Deck("B", context)
-
-              var echoEnabled = false
-              var vocalRemovalEnabled = false
-              var filterEnabled = false
-
-              var crossfader: Float = 0.5f
-                  set(value) {
-                      field = value.coerceIn(0f, 1f)
-                      val a = cos(field * Math.PI / 2).toFloat()
-                      val b = sin(field * Math.PI / 2).toFloat()
-                      deckA.setVolume(a)
-                      deckB.setVolume(b)
-                  }
-
-              fun release() {
-                  deckA.release()
-                  deckB.release()
-              }
-          }
-          EOF
-
-      - name: Write DJViewModel.kt
-        run: |
-          cat > app/src/main/java/com/example/djvideomixer/DJViewModel.kt << 'EOF'
-          package com.example.djvideomixer
-
-          import android.app.Application
-          import androidx.compose.runtime.State
-          import androidx.compose.runtime.mutableStateOf
-          import androidx.lifecycle.AndroidViewModel
-
-          class DJViewModel(app: Application) : AndroidViewModel(app) {
-              private val engine = AudioEngine(app)
-
-              private val _crossfader = mutableStateOf(0.5f)
-              val crossfader: State<Float> = _crossfader
-
-              private val _echo = mutableStateOf(false)
-              val echo: State<Boolean> = _echo
-
-              private val _vocal = mutableStateOf(false)
-              val vocal: State<Boolean> = _vocal
-
-              private val _filter = mutableStateOf(false)
-              val filter: State<Boolean> = _filter
-
-              private val _videoAlpha = mutableStateOf(0.5f)
-              val videoAlpha: State<Float> = _videoAlpha
-
-              fun setCrossfader(v: Float) {
-                  _crossfader.value = v
-                  engine.crossfader = v
-                  _videoAlpha.value = 1f - v
-              }
-
-              fun toggleEcho() {
-                  _echo.value = !_echo.value
-                  engine.echoEnabled = _echo.value
-              }
-
-              fun toggleVocal() {
-                  _vocal.value = !_vocal.value
-                  engine.vocalRemovalEnabled = _vocal.value
-              }
-
-              fun toggleFilter() {
-                  _filter.value = !_filter.value
-                  engine.filterEnabled = _filter.value
-              }
-
-              fun loadA(uri: String) = engine.deckA.load(uri)
-              fun loadB(uri: String) = engine.deckB.load(uri)
-              fun toggleA() = engine.deckA.toggle()
-              fun toggleB() = engine.deckB.toggle()
-
-              fun scratchA(rate: Float) = engine.deckA.scratchRate(rate)
-              fun scratchB(rate: Float) = engine.deckB.scratchRate(rate)
-              fun endScratchA() = engine.deckA.resetRate()
-              fun endScratchB() = engine.deckB.resetRate()
-
-              fun release() = engine.release()
-          }
-          EOF
-
-      - name: Write VideoDeckView.kt
-        run: |
-          cat > app/src/main/java/com/example/djvideomixer/VideoDeckView.kt << 'EOF'
-          package com.example.djvideomixer
-
-          import androidx.compose.runtime.Composable
-          import androidx.compose.ui.Modifier
-          import androidx.compose.ui.graphics.graphicsLayer
-          import androidx.compose.ui.viewinterop.AndroidView
-          import androidx.media3.ui.PlayerView
-
-          @Composable
-          fun VideoDeckView(
-              deck: Deck,
-              alpha: Float,
-              modifier: Modifier = Modifier
-          ) {
-              AndroidView(
-                  modifier = modifier.graphicsLayer { this.alpha = alpha },
-                  factory = { ctx ->
-                      PlayerView(ctx).apply {
-                          player = deck.player
-                          useController = false
-                          setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
-                      }
-                  }
-              )
-          }
-          EOF
-
-      - name: Write JogWheel.kt
-        run: |
-          cat > app/src/main/java/com/example/djvideomixer/JogWheel.kt << 'EOF'
-          package com.example.djvideomixer
+          cat > app/src/main/java/com/djpro/mixer/SixDeckScreen.kt << 'EOF'
+          package com.djpro.mixer
 
           import androidx.compose.foundation.background
-          import androidx.compose.foundation.gestures.detectDragGestures
-          import androidx.compose.foundation.layout.Box
-          import androidx.compose.foundation.layout.size
-          import androidx.compose.foundation.shape.CircleShape
-          import androidx.compose.material3.Text
-          import androidx.compose.runtime.Composable
+          import androidx.compose.foundation.border
+          import androidx.compose.foundation.layout.*
+          import androidx.compose.foundation.shape.RoundedCornerShape
+          import androidx.compose.material3.*
+          import androidx.compose.runtime.*
           import androidx.compose.ui.Alignment
           import androidx.compose.ui.Modifier
           import androidx.compose.ui.draw.clip
           import androidx.compose.ui.graphics.Color
-          import androidx.compose.ui.input.pointer.pointerInput
-          import androidx.compose.ui.unit.dp
-
-          @Composable
-          fun JogWheel(
-              label: String,
-              onScratch: (Float) -> Unit,
-              onRelease: () -> Unit
-          ) {
-              Box(
-                  modifier = Modifier
-                      .size(140.dp)
-                      .clip(CircleShape)
-                      .background(Color(0xFF222222))
-                      .pointerInput(Unit) {
-                          detectDragGestures(
-                              onDrag = { change, drag ->
-                                  change.consume()
-                                  val rate = 1f + (-drag.y / 200f)
-                                  onScratch(rate)
-                              },
-                              onDragEnd = { onRelease() },
-                              onDragCancel = { onRelease() }
-                          )
-                      },
-                  contentAlignment = Alignment.Center
-              ) {
-                  Text(label, color = Color.White)
-              }
-          }
-          EOF
-
-      - name: Write DJScreen.kt
-        run: |
-          cat > app/src/main/java/com/example/djvideomixer/DJScreen.kt << 'EOF'
-          package com.example.djvideomixer
-
-          import androidx.compose.foundation.background
-          import androidx.compose.foundation.layout.*
-          import androidx.compose.material3.*
-          import androidx.compose.runtime.Composable
-          import androidx.compose.runtime.getValue
-          import androidx.compose.ui.Alignment
-          import androidx.compose.ui.Modifier
-          import androidx.compose.ui.graphics.Color
+          import androidx.compose.ui.text.font.FontWeight
           import androidx.compose.ui.unit.dp
           import androidx.compose.ui.unit.sp
 
-          @Composable
-          fun DJScreen(vm: DJViewModel) {
-              val crossfader by vm.crossfader
-              val echo by vm.echo
-              val vocal by vm.vocal
-              val filter by vm.filter
-              val videoAlpha by vm.videoAlpha
+          private val deckColors = listOf(
+              Neon.CYAN, Neon.MAGENTA, Neon.LIME, Neon.ORANGE, Neon.PURPLE, Neon.RED
+          )
 
+          @Composable
+          fun SixDeckScreen() {
               Column(
                   modifier = Modifier
                       .fillMaxSize()
-                      .background(Color.Black)
+                      .background(Neon.BG)
                       .padding(8.dp)
               ) {
-                  // ---- VIDEO MIX AREA (upper middle) ----
-                  Box(
-                      modifier = Modifier
-                          .fillMaxWidth()
-                          .weight(1f)
-                          .background(Color(0xFF111111)),
-                      contentAlignment = Alignment.Center
-                  ) {
-                      VideoDeckView(deck = vm.deckA, alpha = 1f, modifier = Modifier.fillMaxSize())
-                      VideoDeckView(deck = vm.deckB, alpha = videoAlpha, modifier = Modifier.fillMaxSize())
-                      Text("VIDEO MIX", color = Color.White.copy(alpha = 0.3f), fontSize = 24.sp)
-                  }
-
-                  Spacer(Modifier.height(8.dp))
-
-                  // ---- DECKS ROW ----
+                  // Header
                   Row(
-                      modifier = Modifier.fillMaxWidth(),
-                      horizontalArrangement = Arrangement.SpaceEvenly,
+                      modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                      horizontalArrangement = Arrangement.SpaceBetween,
                       verticalAlignment = Alignment.CenterVertically
                   ) {
-                      DeckPanel(
-                          title = "DECK A",
-                          onLoad = { vm.loadA("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4") },
-                          onPlay = { vm.toggleA() },
-                          onScratch = { vm.scratchA(it) },
-                          onRelease = { vm.endScratchA() }
-                      )
-
-                      DeckPanel(
-                          title = "DECK B",
-                          onLoad = { vm.loadB("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4") },
-                          onPlay = { vm.toggleB() },
-                          onScratch = { vm.scratchB(it) },
-                          onRelease = { vm.endScratchB() }
-                      )
+                      Text("DJ PRO MIXER", color = Neon.CYAN, fontSize = 20.sp,
+                          fontWeight = FontWeight.Bold, letterSpacing = 4.sp)
+                      Text("6-DECK / STEMS / VIDEO", color = Neon.TEXT_DIM, fontSize = 10.sp,
+                          letterSpacing = 2.sp)
                   }
 
                   Spacer(Modifier.height(8.dp))
 
-                  // ---- CROSSFADER + FX ----
-                  Column(
-                      modifier = Modifier.fillMaxWidth(),
-                      horizontalAlignment = Alignment.CenterHorizontally
+                  // Main area: 2 big video decks on top, crossfader below
+                  Row(
+                      modifier = Modifier.fillMaxWidth().weight(1f),
+                      horizontalArrangement = Arrangement.spacedBy(8.dp)
                   ) {
-                      Text("CROSSFADER", color = Color.White, fontSize = 12.sp)
-                      Slider(
-                          value = crossfader,
-                          onValueChange = { vm.setCrossfader(it) },
-                          modifier = Modifier.fillMaxWidth()
-                      )
+                      BigDeckPanel("DECK 1", deckColors[0], Modifier.weight(1f))
+                      CenterMixPanel(Modifier.weight(1.2f))
+                      BigDeckPanel("DECK 2", deckColors[1], Modifier.weight(1f))
+                  }
 
-                      Spacer(Modifier.height(4.dp))
+                  Spacer(Modifier.height(8.dp))
 
-                      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                          FxButton("ECHO", echo) { vm.toggleEcho() }
-                          FxButton("VOCAL OFF", vocal) { vm.toggleVocal() }
-                          FxButton("FILTER", filter) { vm.toggleFilter() }
+                  // 4 mini sample decks
+                  Row(
+                      modifier = Modifier.fillMaxWidth().height(140.dp),
+                      horizontalArrangement = Arrangement.spacedBy(8.dp)
+                  ) {
+                      for (i in 2 until 6) {
+                          MiniDeckPanel("DECK ${i+1}", deckColors[i], Modifier.weight(1f))
                       }
                   }
               }
           }
 
           @Composable
-          fun DeckPanel(
-              title: String,
-              onLoad: () -> Unit,
-              onPlay: () -> Unit,
-              onScratch: (Float) -> Unit,
-              onRelease: () -> Unit
-          ) {
-              Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                  Text(title, color = Color.White, fontSize = 12.sp)
-                  Spacer(Modifier.height(4.dp))
-                  JogWheel(label = "SCRATCH", onScratch = onScratch, onRelease = onRelease)
-                  Spacer(Modifier.height(4.dp))
+          fun BigDeckPanel(title: String, accent: Color, modifier: Modifier) {
+              Column(
+                  modifier = modifier
+                      .clip(RoundedCornerShape(14.dp))
+                      .background(Neon.PANEL)
+                      .border(1.dp, accent.copy(alpha = 0.4f), RoundedCornerShape(14.dp))
+                      .padding(10.dp),
+                  verticalArrangement = Arrangement.SpaceBetween,
+                  horizontalAlignment = Alignment.CenterHorizontally
+              ) {
+                  Text(title, color = accent, fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                      letterSpacing = 2.sp)
+
+                  Box(
+                      modifier = Modifier
+                          .size(180.dp)
+                          .clip(RoundedCornerShape(90.dp))
+                          .background(Color(0xFF16161E))
+                          .border(3.dp, accent, RoundedCornerShape(90.dp))
+                  )
+
+                  // Stem mute row
                   Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                      Button(onClick = onLoad) { Text("LOAD", fontSize = 10.sp) }
-                      Button(onClick = onPlay) { Text("PLAY", fontSize = 10.sp) }
+                      StemButton("VOX", accent)
+                      StemButton("DRM", accent)
+                      StemButton("BAS", accent)
+                      StemButton("OTH", accent)
+                  }
+
+                  // Transport
+                  Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                      TransportBtn("LOAD", accent)
+                      TransportBtn("▶", accent)
+                      TransportBtn("CUE", accent)
                   }
               }
           }
 
           @Composable
-          fun FxButton(label: String, active: Boolean, onClick: () -> Unit) {
-              Button(
-                  onClick = onClick,
-                  colors = ButtonDefaults.buttonColors(
-                      containerColor = if (active) Color(0xFF00BCD4) else Color(0xFF333333)
-                  )
+          fun StemButton(label: String, accent: Color) {
+              Box(
+                  modifier = Modifier
+                      .size(38.dp)
+                      .clip(RoundedCornerShape(8.dp))
+                      .background(Color(0xFF1A1A24))
+                      .border(1.dp, accent.copy(alpha = 0.3f), RoundedCornerShape(8.dp)),
+                  contentAlignment = Alignment.Center
               ) {
-                  Text(label, fontSize = 11.sp)
+                  Text(label, color = accent.copy(alpha = 0.7f), fontSize = 9.sp,
+                      fontWeight = FontWeight.Bold)
+              }
+          }
+
+          @Composable
+          fun TransportBtn(label: String, accent: Color) {
+              Box(
+                  modifier = Modifier
+                      .clip(RoundedCornerShape(8.dp))
+                      .background(Color(0xFF1A1A24))
+                      .border(1.dp, accent.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                      .padding(horizontal = 10.dp, vertical = 6.dp)
+              ) {
+                  Text(label, color = accent, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+              }
+          }
+
+          @Composable
+          fun CenterMixPanel(modifier: Modifier) {
+              Column(
+                  modifier = modifier
+                      .clip(RoundedCornerShape(14.dp))
+                      .background(Neon.PANEL)
+                      .border(1.dp, Color(0xFF2A2A3A), RoundedCornerShape(14.dp))
+                      .padding(10.dp),
+                  verticalArrangement = Arrangement.spacedBy(8.dp)
+              ) {
+                  // Video mix window
+                  Box(
+                      modifier = Modifier
+                          .fillMaxWidth()
+                          .weight(1f)
+                          .clip(RoundedCornerShape(10.dp))
+                          .background(Color.Black)
+                          .border(1.dp, Neon.CYAN.copy(alpha = 0.3f), RoundedCornerShape(10.dp)),
+                      contentAlignment = Alignment.Center
+                  ) {
+                      Text("VIDEO MIX", color = Neon.CYAN.copy(alpha = 0.4f),
+                          fontSize = 12.sp, letterSpacing = 3.sp)
+                  }
+
+                  // Crossfader
+                  Text("CROSSFADER", color = Neon.TEXT_DIM, fontSize = 9.sp,
+                      letterSpacing = 2.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
+                  Slider(
+                      value = 0.5f,
+                      onValueChange = {},
+                      colors = SliderDefaults.colors(
+                          thumbColor = Neon.CYAN,
+                          activeTrackColor = Neon.CYAN,
+                          inactiveTrackColor = Neon.MAGENTA.copy(alpha = 0.5f)
+                      ),
+                      modifier = Modifier.fillMaxWidth()
+                  )
+
+                  // FX row
+                  Row(
+                      modifier = Modifier.fillMaxWidth(),
+                      horizontalArrangement = Arrangement.spacedBy(6.dp)
+                  ) {
+                      FxChip("ECHO", Neon.CYAN, Modifier.weight(1f))
+                      FxChip("FILTER", Neon.LIME, Modifier.weight(1f))
+                      FxChip("FLANGE", Neon.PURPLE, Modifier.weight(1f))
+                  }
+                  Row(
+                      modifier = Modifier.fillMaxWidth(),
+                      horizontalArrangement = Arrangement.spacedBy(6.dp)
+                  ) {
+                      FxChip("REVERB", Neon.ORANGE, Modifier.weight(1f))
+                      FxChip("REC", Neon.RED, Modifier.weight(1f))
+                      FxChip("MASTER", Neon.MAGENTA, Modifier.weight(1f))
+                  }
+              }
+          }
+
+          @Composable
+          fun FxChip(label: String, accent: Color, modifier: Modifier) {
+              Box(
+                  modifier = modifier
+                      .clip(RoundedCornerShape(10.dp))
+                      .background(accent.copy(alpha = 0.12f))
+                      .border(1.dp, accent.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                      .padding(vertical = 10.dp),
+                  contentAlignment = Alignment.Center
+              ) {
+                  Text(label, color = accent, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                      letterSpacing = 1.sp)
+              }
+          }
+
+          @Composable
+          fun MiniDeckPanel(title: String, accent: Color, modifier: Modifier) {
+              Column(
+                  modifier = modifier
+                      .clip(RoundedCornerShape(12.dp))
+                      .background(Neon.PANEL)
+                      .border(1.dp, accent.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                      .padding(8.dp),
+                  horizontalAlignment = Alignment.CenterHorizontally,
+                  verticalArrangement = Arrangement.SpaceBetween
+              ) {
+                  Text(title, color = accent, fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                      letterSpacing = 1.sp)
+                  Box(
+                      modifier = Modifier
+                          .size(58.dp)
+                          .clip(RoundedCornerShape(29.dp))
+                          .background(Color(0xFF16161E))
+                          .border(2.dp, accent.copy(alpha = 0.6f), RoundedCornerShape(29.dp))
+                  )
+                  Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                      TransportBtn("L", accent)
+                      TransportBtn("▶", accent)
+                  }
               }
           }
           EOF
 
-      # ---------- EXPOSE DECK IN VIEWMODEL ----------
-
-      - name: Patch DJViewModel to expose decks
-        run: |
-          cat > app/src/main/java/com/example/djvideomixer/DJViewModel.kt << 'EOF'
-          package com.example.djvideomixer
-
-          import android.app.Application
-          import androidx.compose.runtime.State
-          import androidx.compose.runtime.mutableStateOf
-          import androidx.lifecycle.AndroidViewModel
-
-          class DJViewModel(app: Application) : AndroidViewModel(app) {
-              private val engine = AudioEngine(app)
-
-              val deckA: Deck get() = engine.deckA
-              val deckB: Deck get() = engine.deckB
-
-              private val _crossfader = mutableStateOf(0.5f)
-              val crossfader: State<Float> = _crossfader
-
-              private val _echo = mutableStateOf(false)
-              val echo: State<Boolean> = _echo
-
-              private val _vocal = mutableStateOf(false)
-              val vocal: State<Boolean> = _vocal
-
-              private val _filter = mutableStateOf(false)
-              val filter: State<Boolean> = _filter
-
-              private val _videoAlpha = mutableStateOf(0.5f)
-              val videoAlpha: State<Float> = _videoAlpha
-
-              fun setCrossfader(v: Float) {
-                  _crossfader.value = v
-                  engine.crossfader = v
-                  _videoAlpha.value = 1f - v
-              }
-
-              fun toggleEcho() {
-                  _echo.value = !_echo.value
-                  engine.echoEnabled = _echo.value
-              }
-
-              fun toggleVocal() {
-                  _vocal.value = !_vocal.value
-                  engine.vocalRemovalEnabled = _vocal.value
-              }
-
-              fun toggleFilter() {
-                  _filter.value = !_filter.value
-                  engine.filterEnabled = _filter.value
-              }
-
-              fun loadA(uri: String) = engine.deckA.load(uri)
-              fun loadB(uri: String) = engine.deckB.load(uri)
-              fun toggleA() = engine.deckA.toggle()
-              fun toggleB() = engine.deckB.toggle()
-
-              fun scratchA(rate: Float) = engine.deckA.scratchRate(rate)
-              fun scratchB(rate: Float) = engine.deckB.scratchRate(rate)
-              fun endScratchA() = engine.deckA.resetRate()
-              fun endScratchB() = engine.deckB.resetRate()
-
-              fun release() = engine.release()
-          }
-          EOF
-
-      # ---------- GIT IGNORE + COMMIT ----------
-
-      - name: Write .gitignore
+      - name: .gitignore and commit
         run: |
           cat > .gitignore << 'EOF'
           *.iml
@@ -678,29 +1155,26 @@ jobs:
           /captures
           .externalNativeBuild
           .cxx
+          *.apk
+          *.aab
           EOF
-
-      - name: Commit and push
-        run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Build DJ Video Mixer app scaffold" || echo "Nothing to commit"
+          git commit -m "Pro DJ app: 6 decks, Oboe engine, stems, video recording" || echo "nothing"
           git push
 
-      # ---------- BUILD APK ----------
-
-      - name: Set up JDK 17
+      - name: JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
-      - name: Build debug APK
+      - name: Build APK
         run: ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: DJVideoMixer-debug
+          name: DJProMixer-debug
           path: app/build/outputs/apk/debug/app-debug.apk
