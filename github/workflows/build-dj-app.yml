@@ -1,0 +1,706 @@
+name: Build DJ Video Mixer App
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  build-app:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create directory structure
+        run: |
+          mkdir -p app/src/main/java/com/example/djvideomixer
+          mkdir -p app/src/main/res/values
+          mkdir -p app/src/main/res/xml
+          mkdir -p gradle/wrapper
+
+      # ---------- ROOT GRADLE FILES ----------
+
+      - name: Write settings.gradle.kts
+        run: |
+          cat > settings.gradle.kts << 'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "DJVideoMixer"
+          include(":app")
+          EOF
+
+      - name: Write root build.gradle.kts
+        run: |
+          cat > build.gradle.kts << 'EOF'
+          plugins {
+              id("com.android.application") version "8.5.2" apply false
+              id("org.jetbrains.kotlin.android") version "1.9.24" apply false
+          }
+          EOF
+
+      - name: Write gradle.properties
+        run: |
+          cat > gradle.properties << 'EOF'
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          kotlin.code.style=official
+          android.nonTransitiveRClass=true
+          EOF
+
+      - name: Write gradle-wrapper.properties
+        run: |
+          cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.7-bin.zip
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+          EOF
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.7
+
+      - name: Generate Gradle wrapper
+        run: gradle wrapper --gradle-version 8.7
+
+      # ---------- APP MODULE ----------
+
+      - name: Write app/build.gradle.kts
+        run: |
+          cat > app/build.gradle.kts << 'EOF'
+          plugins {
+              id("com.android.application")
+              id("org.jetbrains.kotlin.android")
+          }
+
+          android {
+              namespace = "com.example.djvideomixer"
+              compileSdk = 34
+
+              defaultConfig {
+                  applicationId = "com.example.djvideomixer"
+                  minSdk = 24
+                  targetSdk = 34
+                  versionCode = 1
+                  versionName = "1.0"
+              }
+
+              buildTypes {
+                  release {
+                      isMinifyEnabled = false
+                  }
+              }
+
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+
+              kotlinOptions {
+                  jvmTarget = "17"
+              }
+
+              buildFeatures {
+                  compose = true
+                  viewBinding = true
+              }
+
+              composeOptions {
+                  kotlinCompilerExtensionVersion = "1.5.14"
+              }
+
+              packaging {
+                  resources {
+                      excludes += "/META-INF/{AL2.0,LGPL2.1}"
+                  }
+              }
+          }
+
+          dependencies {
+              implementation("androidx.core:core-ktx:1.13.1")
+              implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
+              implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
+              implementation("androidx.activity:activity-compose:1.9.1")
+              implementation(platform("androidx.compose:compose-bom:2024.09.00"))
+              implementation("androidx.compose.ui:ui")
+              implementation("androidx.compose.ui:ui-graphics")
+              implementation("androidx.compose.material3:material3")
+              implementation("androidx.compose.material:material-icons-extended")
+              implementation("androidx.media3:media3-exoplayer:1.4.1")
+              implementation("androidx.media3:media3-ui:1.4.1")
+              implementation("androidx.media3:media3-common:1.4.1")
+              implementation("androidx.media3:media3-effect:1.4.1")
+              implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+          }
+          EOF
+
+      # ---------- MANIFEST ----------
+
+      - name: Write AndroidManifest.xml
+        run: |
+          cat > app/src/main/AndroidManifest.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+              <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+              <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+                  android:maxSdkVersion="32" />
+              <uses-permission android:name="android.permission.RECORD_AUDIO" />
+              <uses-permission android:name="android.permission.INTERNET" />
+
+              <application
+                  android:allowBackup="true"
+                  android:label="DJ Video Mixer"
+                  android:theme="@style/Theme.DJVideoMixer"
+                  android:supportsRtl="true">
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:screenOrientation="landscape"
+                      android:configChanges="orientation|screenSize|keyboardHidden">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+
+      # ---------- RESOURCES ----------
+
+      - name: Write themes.xml
+        run: |
+          cat > app/src/main/res/values/themes.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="Theme.DJVideoMixer" parent="android:Theme.Material.NoActionBar">
+                  <item name="android:statusBarColor">#000000</item>
+                  <item name="android:navigationBarColor">#000000</item>
+                  <item name="android:windowBackground">#000000</item>
+              </style>
+          </resources>
+          EOF
+
+      - name: Write strings.xml
+        run: |
+          cat > app/src/main/res/values/strings.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <string name="app_name">DJ Video Mixer</string>
+          </resources>
+          EOF
+
+      # ---------- KOTLIN SOURCE ----------
+
+      - name: Write MainActivity.kt
+        run: |
+          cat > app/src/main/java/com/example/djvideomixer/MainActivity.kt << 'EOF'
+          package com.example.djvideomixer
+
+          import android.os.Bundle
+          import androidx.activity.ComponentActivity
+          import androidx.activity.compose.setContent
+          import androidx.activity.viewModels
+          import androidx.compose.foundation.layout.fillMaxSize
+          import androidx.compose.material3.MaterialTheme
+          import androidx.compose.material3.Surface
+          import androidx.compose.ui.Modifier
+
+          class MainActivity : ComponentActivity() {
+              private val viewModel: DJViewModel by viewModels()
+
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  setContent {
+                      MaterialTheme {
+                          Surface(modifier = Modifier.fillMaxSize()) {
+                              DJScreen(viewModel)
+                          }
+                      }
+                  }
+              }
+
+              override fun onDestroy() {
+                  super.onDestroy()
+                  viewModel.release()
+              }
+          }
+          EOF
+
+      - name: Write Deck.kt
+        run: |
+          cat > app/src/main/java/com/example/djvideomixer/Deck.kt << 'EOF'
+          package com.example.djvideomixer
+
+          import android.content.Context
+          import androidx.media3.common.MediaItem
+          import androidx.media3.common.Player
+          import androidx.media3.exoplayer.ExoPlayer
+
+          class Deck(val id: String, context: Context) {
+              val player: ExoPlayer = ExoPlayer.Builder(context).build().apply {
+                  repeatMode = Player.REPEAT_MODE_OFF
+                  playWhenReady = false
+              }
+
+              private var baseVolume: Float = 1f
+
+              fun load(uri: String) {
+                  player.setMediaItem(MediaItem.fromUri(uri))
+                  player.prepare()
+              }
+
+              fun play() = player.play()
+              fun pause() = player.pause()
+              fun toggle() { if (player.isPlaying) pause() else play() }
+
+              fun setVolume(v: Float) {
+                  baseVolume = v.coerceIn(0f, 1f)
+                  player.volume = baseVolume
+              }
+
+              fun scratchRate(rate: Float) {
+                  val clamped = rate.coerceIn(0.25f, 2.5f)
+                  player.setPlaybackSpeed(clamped)
+              }
+
+              fun resetRate() {
+                  player.setPlaybackSpeed(1f)
+              }
+
+              fun release() = player.release()
+          }
+          EOF
+
+      - name: Write AudioEngine.kt
+        run: |
+          cat > app/src/main/java/com/example/djvideomixer/AudioEngine.kt << 'EOF'
+          package com.example.djvideomixer
+
+          import android.content.Context
+          import kotlin.math.cos
+          import kotlin.math.sin
+
+          class AudioEngine(context: Context) {
+              val deckA = Deck("A", context)
+              val deckB = Deck("B", context)
+
+              var echoEnabled = false
+              var vocalRemovalEnabled = false
+              var filterEnabled = false
+
+              var crossfader: Float = 0.5f
+                  set(value) {
+                      field = value.coerceIn(0f, 1f)
+                      val a = cos(field * Math.PI / 2).toFloat()
+                      val b = sin(field * Math.PI / 2).toFloat()
+                      deckA.setVolume(a)
+                      deckB.setVolume(b)
+                  }
+
+              fun release() {
+                  deckA.release()
+                  deckB.release()
+              }
+          }
+          EOF
+
+      - name: Write DJViewModel.kt
+        run: |
+          cat > app/src/main/java/com/example/djvideomixer/DJViewModel.kt << 'EOF'
+          package com.example.djvideomixer
+
+          import android.app.Application
+          import androidx.compose.runtime.State
+          import androidx.compose.runtime.mutableStateOf
+          import androidx.lifecycle.AndroidViewModel
+
+          class DJViewModel(app: Application) : AndroidViewModel(app) {
+              private val engine = AudioEngine(app)
+
+              private val _crossfader = mutableStateOf(0.5f)
+              val crossfader: State<Float> = _crossfader
+
+              private val _echo = mutableStateOf(false)
+              val echo: State<Boolean> = _echo
+
+              private val _vocal = mutableStateOf(false)
+              val vocal: State<Boolean> = _vocal
+
+              private val _filter = mutableStateOf(false)
+              val filter: State<Boolean> = _filter
+
+              private val _videoAlpha = mutableStateOf(0.5f)
+              val videoAlpha: State<Float> = _videoAlpha
+
+              fun setCrossfader(v: Float) {
+                  _crossfader.value = v
+                  engine.crossfader = v
+                  _videoAlpha.value = 1f - v
+              }
+
+              fun toggleEcho() {
+                  _echo.value = !_echo.value
+                  engine.echoEnabled = _echo.value
+              }
+
+              fun toggleVocal() {
+                  _vocal.value = !_vocal.value
+                  engine.vocalRemovalEnabled = _vocal.value
+              }
+
+              fun toggleFilter() {
+                  _filter.value = !_filter.value
+                  engine.filterEnabled = _filter.value
+              }
+
+              fun loadA(uri: String) = engine.deckA.load(uri)
+              fun loadB(uri: String) = engine.deckB.load(uri)
+              fun toggleA() = engine.deckA.toggle()
+              fun toggleB() = engine.deckB.toggle()
+
+              fun scratchA(rate: Float) = engine.deckA.scratchRate(rate)
+              fun scratchB(rate: Float) = engine.deckB.scratchRate(rate)
+              fun endScratchA() = engine.deckA.resetRate()
+              fun endScratchB() = engine.deckB.resetRate()
+
+              fun release() = engine.release()
+          }
+          EOF
+
+      - name: Write VideoDeckView.kt
+        run: |
+          cat > app/src/main/java/com/example/djvideomixer/VideoDeckView.kt << 'EOF'
+          package com.example.djvideomixer
+
+          import androidx.compose.runtime.Composable
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.graphics.graphicsLayer
+          import androidx.compose.ui.viewinterop.AndroidView
+          import androidx.media3.ui.PlayerView
+
+          @Composable
+          fun VideoDeckView(
+              deck: Deck,
+              alpha: Float,
+              modifier: Modifier = Modifier
+          ) {
+              AndroidView(
+                  modifier = modifier.graphicsLayer { this.alpha = alpha },
+                  factory = { ctx ->
+                      PlayerView(ctx).apply {
+                          player = deck.player
+                          useController = false
+                          setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
+                      }
+                  }
+              )
+          }
+          EOF
+
+      - name: Write JogWheel.kt
+        run: |
+          cat > app/src/main/java/com/example/djvideomixer/JogWheel.kt << 'EOF'
+          package com.example.djvideomixer
+
+          import androidx.compose.foundation.background
+          import androidx.compose.foundation.gestures.detectDragGestures
+          import androidx.compose.foundation.layout.Box
+          import androidx.compose.foundation.layout.size
+          import androidx.compose.foundation.shape.CircleShape
+          import androidx.compose.material3.Text
+          import androidx.compose.runtime.Composable
+          import androidx.compose.ui.Alignment
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.draw.clip
+          import androidx.compose.ui.graphics.Color
+          import androidx.compose.ui.input.pointer.pointerInput
+          import androidx.compose.ui.unit.dp
+
+          @Composable
+          fun JogWheel(
+              label: String,
+              onScratch: (Float) -> Unit,
+              onRelease: () -> Unit
+          ) {
+              Box(
+                  modifier = Modifier
+                      .size(140.dp)
+                      .clip(CircleShape)
+                      .background(Color(0xFF222222))
+                      .pointerInput(Unit) {
+                          detectDragGestures(
+                              onDrag = { change, drag ->
+                                  change.consume()
+                                  val rate = 1f + (-drag.y / 200f)
+                                  onScratch(rate)
+                              },
+                              onDragEnd = { onRelease() },
+                              onDragCancel = { onRelease() }
+                          )
+                      },
+                  contentAlignment = Alignment.Center
+              ) {
+                  Text(label, color = Color.White)
+              }
+          }
+          EOF
+
+      - name: Write DJScreen.kt
+        run: |
+          cat > app/src/main/java/com/example/djvideomixer/DJScreen.kt << 'EOF'
+          package com.example.djvideomixer
+
+          import androidx.compose.foundation.background
+          import androidx.compose.foundation.layout.*
+          import androidx.compose.material3.*
+          import androidx.compose.runtime.Composable
+          import androidx.compose.runtime.getValue
+          import androidx.compose.ui.Alignment
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.graphics.Color
+          import androidx.compose.ui.unit.dp
+          import androidx.compose.ui.unit.sp
+
+          @Composable
+          fun DJScreen(vm: DJViewModel) {
+              val crossfader by vm.crossfader
+              val echo by vm.echo
+              val vocal by vm.vocal
+              val filter by vm.filter
+              val videoAlpha by vm.videoAlpha
+
+              Column(
+                  modifier = Modifier
+                      .fillMaxSize()
+                      .background(Color.Black)
+                      .padding(8.dp)
+              ) {
+                  // ---- VIDEO MIX AREA (upper middle) ----
+                  Box(
+                      modifier = Modifier
+                          .fillMaxWidth()
+                          .weight(1f)
+                          .background(Color(0xFF111111)),
+                      contentAlignment = Alignment.Center
+                  ) {
+                      VideoDeckView(deck = vm.deckA, alpha = 1f, modifier = Modifier.fillMaxSize())
+                      VideoDeckView(deck = vm.deckB, alpha = videoAlpha, modifier = Modifier.fillMaxSize())
+                      Text("VIDEO MIX", color = Color.White.copy(alpha = 0.3f), fontSize = 24.sp)
+                  }
+
+                  Spacer(Modifier.height(8.dp))
+
+                  // ---- DECKS ROW ----
+                  Row(
+                      modifier = Modifier.fillMaxWidth(),
+                      horizontalArrangement = Arrangement.SpaceEvenly,
+                      verticalAlignment = Alignment.CenterVertically
+                  ) {
+                      DeckPanel(
+                          title = "DECK A",
+                          onLoad = { vm.loadA("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4") },
+                          onPlay = { vm.toggleA() },
+                          onScratch = { vm.scratchA(it) },
+                          onRelease = { vm.endScratchA() }
+                      )
+
+                      DeckPanel(
+                          title = "DECK B",
+                          onLoad = { vm.loadB("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4") },
+                          onPlay = { vm.toggleB() },
+                          onScratch = { vm.scratchB(it) },
+                          onRelease = { vm.endScratchB() }
+                      )
+                  }
+
+                  Spacer(Modifier.height(8.dp))
+
+                  // ---- CROSSFADER + FX ----
+                  Column(
+                      modifier = Modifier.fillMaxWidth(),
+                      horizontalAlignment = Alignment.CenterHorizontally
+                  ) {
+                      Text("CROSSFADER", color = Color.White, fontSize = 12.sp)
+                      Slider(
+                          value = crossfader,
+                          onValueChange = { vm.setCrossfader(it) },
+                          modifier = Modifier.fillMaxWidth()
+                      )
+
+                      Spacer(Modifier.height(4.dp))
+
+                      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                          FxButton("ECHO", echo) { vm.toggleEcho() }
+                          FxButton("VOCAL OFF", vocal) { vm.toggleVocal() }
+                          FxButton("FILTER", filter) { vm.toggleFilter() }
+                      }
+                  }
+              }
+          }
+
+          @Composable
+          fun DeckPanel(
+              title: String,
+              onLoad: () -> Unit,
+              onPlay: () -> Unit,
+              onScratch: (Float) -> Unit,
+              onRelease: () -> Unit
+          ) {
+              Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                  Text(title, color = Color.White, fontSize = 12.sp)
+                  Spacer(Modifier.height(4.dp))
+                  JogWheel(label = "SCRATCH", onScratch = onScratch, onRelease = onRelease)
+                  Spacer(Modifier.height(4.dp))
+                  Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                      Button(onClick = onLoad) { Text("LOAD", fontSize = 10.sp) }
+                      Button(onClick = onPlay) { Text("PLAY", fontSize = 10.sp) }
+                  }
+              }
+          }
+
+          @Composable
+          fun FxButton(label: String, active: Boolean, onClick: () -> Unit) {
+              Button(
+                  onClick = onClick,
+                  colors = ButtonDefaults.buttonColors(
+                      containerColor = if (active) Color(0xFF00BCD4) else Color(0xFF333333)
+                  )
+              ) {
+                  Text(label, fontSize = 11.sp)
+              }
+          }
+          EOF
+
+      # ---------- EXPOSE DECK IN VIEWMODEL ----------
+
+      - name: Patch DJViewModel to expose decks
+        run: |
+          cat > app/src/main/java/com/example/djvideomixer/DJViewModel.kt << 'EOF'
+          package com.example.djvideomixer
+
+          import android.app.Application
+          import androidx.compose.runtime.State
+          import androidx.compose.runtime.mutableStateOf
+          import androidx.lifecycle.AndroidViewModel
+
+          class DJViewModel(app: Application) : AndroidViewModel(app) {
+              private val engine = AudioEngine(app)
+
+              val deckA: Deck get() = engine.deckA
+              val deckB: Deck get() = engine.deckB
+
+              private val _crossfader = mutableStateOf(0.5f)
+              val crossfader: State<Float> = _crossfader
+
+              private val _echo = mutableStateOf(false)
+              val echo: State<Boolean> = _echo
+
+              private val _vocal = mutableStateOf(false)
+              val vocal: State<Boolean> = _vocal
+
+              private val _filter = mutableStateOf(false)
+              val filter: State<Boolean> = _filter
+
+              private val _videoAlpha = mutableStateOf(0.5f)
+              val videoAlpha: State<Float> = _videoAlpha
+
+              fun setCrossfader(v: Float) {
+                  _crossfader.value = v
+                  engine.crossfader = v
+                  _videoAlpha.value = 1f - v
+              }
+
+              fun toggleEcho() {
+                  _echo.value = !_echo.value
+                  engine.echoEnabled = _echo.value
+              }
+
+              fun toggleVocal() {
+                  _vocal.value = !_vocal.value
+                  engine.vocalRemovalEnabled = _vocal.value
+              }
+
+              fun toggleFilter() {
+                  _filter.value = !_filter.value
+                  engine.filterEnabled = _filter.value
+              }
+
+              fun loadA(uri: String) = engine.deckA.load(uri)
+              fun loadB(uri: String) = engine.deckB.load(uri)
+              fun toggleA() = engine.deckA.toggle()
+              fun toggleB() = engine.deckB.toggle()
+
+              fun scratchA(rate: Float) = engine.deckA.scratchRate(rate)
+              fun scratchB(rate: Float) = engine.deckB.scratchRate(rate)
+              fun endScratchA() = engine.deckA.resetRate()
+              fun endScratchB() = engine.deckB.resetRate()
+
+              fun release() = engine.release()
+          }
+          EOF
+
+      # ---------- GIT IGNORE + COMMIT ----------
+
+      - name: Write .gitignore
+        run: |
+          cat > .gitignore << 'EOF'
+          *.iml
+          .gradle
+          /local.properties
+          /.idea
+          .DS_Store
+          /build
+          /captures
+          .externalNativeBuild
+          .cxx
+          EOF
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Build DJ Video Mixer app scaffold" || echo "Nothing to commit"
+          git push
+
+      # ---------- BUILD APK ----------
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: DJVideoMixer-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
