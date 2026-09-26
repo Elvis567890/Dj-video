@@ -4,13 +4,7 @@ import android.content.Context
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
-import kotlin.math.cos
-import kotlin.math.sin
 
-/**
- * A single DJ deck backed by ExoPlayer.
- * Supports load / play / pause / scratch / volume.
- */
 class DeckPlayer(val index: Int, context: Context) {
 
     val player: ExoPlayer = ExoPlayer.Builder(context).build().apply {

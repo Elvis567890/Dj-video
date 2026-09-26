@@ -45,9 +45,9 @@ import com.djpro.mixer.expand.DeckAnim
 import com.djpro.mixer.expand.ExpandableDeckManager
 import com.djpro.mixer.expand.VideoMixPiP
 
-private val SAMPLE_VIDEO_1 =
+private const val SAMPLE_VIDEO_1 =
     "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
-private val SAMPLE_VIDEO_2 =
+private const val SAMPLE_VIDEO_2 =
     "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
 
 @Composable
@@ -65,7 +65,6 @@ fun SixDeckScreen(engine: AudioEngine) {
             .background(Neon.BG)
             .padding(8.dp)
     ) {
-        // ---- Top bar ----
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -94,7 +93,6 @@ fun SixDeckScreen(engine: AudioEngine) {
 
         Spacer(Modifier.height(6.dp))
 
-        // ---- Main area ----
         Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
             Row(
                 modifier = Modifier.fillMaxSize(),
@@ -161,7 +159,6 @@ fun SixDeckScreen(engine: AudioEngine) {
 
         Spacer(Modifier.height(8.dp))
 
-        // ---- Bottom row mini decks ----
         Row(
             modifier = Modifier.fillMaxWidth().height(140.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)

@@ -4,10 +4,6 @@ import android.content.Context
 import kotlin.math.cos
 import kotlin.math.sin
 
-/**
- * 6-deck audio engine with crossfader between deck 0 and deck 1.
- * Pure Kotlin, no native code — safe to build everywhere.
- */
 class AudioEngine(context: Context) {
 
     val decks: List<DeckPlayer> = (0 until 6).map { DeckPlayer(it, context) }
@@ -23,7 +19,6 @@ class AudioEngine(context: Context) {
     var vocalRemovalEnabled = false
 
     init {
-        // Initialize gain for all decks
         setCrossfader(0.5f)
         setMasterVolume(1.0f)
     }
@@ -34,7 +29,6 @@ class AudioEngine(context: Context) {
         val b = sin(crossfader * Math.PI / 2).toFloat()
         decks[0].setVolume(a * masterVolume)
         decks[1].setVolume(b * masterVolume)
-        // decks 2..5 keep their own volume set externally
     }
 
     fun setMasterVolume(v: Float) {
