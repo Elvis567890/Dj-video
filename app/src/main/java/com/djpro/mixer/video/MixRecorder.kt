@@ -1,5 +1,4 @@
 package com.djpro.mixer.video
-
 import android.content.Context
 import android.content.Intent
 import android.hardware.display.DisplayManager
@@ -12,18 +11,17 @@ import android.os.Environment
 import android.util.DisplayMetrics
 import android.view.WindowManager
 import java.io.File
-
 class MixRecorder(private val context: Context) {
     private var projection: MediaProjection? = null
     private var virtualDisplay: VirtualDisplay? = null
     private var recorder: MediaRecorder? = null
     private var outputFile: File? = null
-
+    var isRecording: Boolean = false; private set
     fun buildIntent(): Intent? = try {
         context.getSystemService(MediaProjectionManager::class.java).createScreenCaptureIntent()
     } catch (_: Throwable) { null }
-
     fun start(resultCode: Int, data: Intent): Boolean {
+        if (isRecording) return false
         return try {
             val mgr = context.getSystemService(MediaProjectionManager::class.java)
             projection = mgr.getMediaProjection(resultCode, data)
@@ -49,14 +47,13 @@ class MixRecorder(private val context: Context) {
                 "DJProRec", w, h, dpi, DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                 rec.surface, null, null
             )
-            rec.start(); true
+            rec.start(); isRecording = true; true
         } catch (_: Throwable) { false }
     }
-
     fun stop(): File? {
         try { recorder?.stop() } catch (_: Throwable) {}
         try { recorder?.release() } catch (_: Throwable) {}
-        recorder = null
+        recorder = null; isRecording = false
         try { virtualDisplay?.release() } catch (_: Throwable) {}
         virtualDisplay = null
         try { projection?.stop() } catch (_: Throwable) {}
