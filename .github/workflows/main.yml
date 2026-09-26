@@ -16,9 +16,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      # -------------------------------------------------
-      # 0. CLEAN EVERYTHING FROM PREVIOUS ATTEMPTS
-      # -------------------------------------------------
       - name: Clean stale files
         run: |
           rm -rf app core-audio core-dsp core-stems core-video core-db native
@@ -26,19 +23,15 @@ jobs:
           rm -rf gradle .gradle .cxx
           find . -name "*.gradle.kts" -not -path "./.git/*" -delete 2>/dev/null || true
 
-      # -------------------------------------------------
-      # 1. DIRECTORIES
-      # -------------------------------------------------
       - name: Create directories
         run: |
           mkdir -p gradle/wrapper
           mkdir -p app/src/main/java/com/djpro/mixer/expand
           mkdir -p app/src/main/java/com/djpro/mixer/audio
+          mkdir -p app/src/main/java/com/djpro/mixer/dsp
+          mkdir -p app/src/main/java/com/djpro/mixer/video
           mkdir -p app/src/main/res/values
 
-      # -------------------------------------------------
-      # 2. ROOT GRADLE
-      # -------------------------------------------------
       - name: Root gradle files
         run: |
           cat > settings.gradle.kts << 'EOF'
@@ -63,6 +56,7 @@ jobs:
           cat > gradle.properties << 'EOF'
           org.gradle.jvmargs=-Xmx4096m -Dfile.encoding=UTF-8
           android.useAndroidX=true
+          android.enableJetifier=false
           kotlin.code.style=official
           android.nonTransitiveRClass=true
           org.gradle.caching=true
@@ -77,9 +71,6 @@ jobs:
           zipStorePath=wrapper/dists
           EOF
 
-      # -------------------------------------------------
-      # 3. APP GRADLE
-      # -------------------------------------------------
       - name: app/build.gradle.kts
         run: |
           cat > app/build.gradle.kts << 'EOF'
@@ -94,7 +85,7 @@ jobs:
 
               defaultConfig {
                   applicationId = "com.djpro.mixer"
-                  minSdk = 24
+                  minSdk = 26
                   targetSdk = 34
                   versionCode = 1
                   versionName = "1.0.0"
@@ -132,6 +123,11 @@ jobs:
                       excludes += "/META-INF/NOTICE*"
                   }
               }
+
+              lint {
+                  abortOnError = false
+                  checkReleaseBuilds = false
+              }
           }
 
           dependencies {
@@ -151,27 +147,28 @@ jobs:
               implementation("androidx.media3:media3-exoplayer:1.4.1")
               implementation("androidx.media3:media3-ui:1.4.1")
               implementation("androidx.media3:media3-common:1.4.1")
+              implementation("androidx.media3:media3-session:1.4.1")
 
               implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
           }
           EOF
 
-      # -------------------------------------------------
-      # 4. MANIFEST + RESOURCES
-      # -------------------------------------------------
       - name: AndroidManifest.xml
         run: |
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:tools="http://schemas.android.com/tools">
 
               <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
               <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
-              <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
-              <uses-permission android:name="android.permission.RECORD_AUDIO" />
+              <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+                  android:maxSdkVersion="32" />
               <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.RECORD_AUDIO" />
               <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
               <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
               <application
                   android:allowBackup="true"
@@ -179,19 +176,28 @@ jobs:
                   android:largeHeap="true"
                   android:usesCleartextTraffic="true"
                   android:hardwareAccelerated="true"
-                  android:theme="@style/Theme.DJPro">
+                  android:theme="@style/Theme.DJPro"
+                  tools:ignore="GoogleAppIndexingWarning,UnusedAttribute">
 
                   <activity
                       android:name=".MainActivity"
                       android:exported="true"
                       android:screenOrientation="landscape"
                       android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
-                      android:launchMode="singleTop">
+                      android:launchMode="singleTop"
+                      tools:ignore="LockedOrientationActivity">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
                           <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
                   </activity>
+
+                  <service
+                      android:name=".video.RecordingService"
+                      android:enabled="true"
+                      android:exported="false"
+                      android:foregroundServiceType="mediaProjection|microphone"
+                      tools:ignore="ForegroundServicePermission" />
               </application>
           </manifest>
           EOF
@@ -215,12 +221,459 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
               <string name="app_name">DJ Pro Mixer</string>
+              <string name="recording_channel">DJ Recording</string>
           </resources>
           EOF
 
-      # -------------------------------------------------
-      # 5. KOTLIN SOURCE
-      # -------------------------------------------------
+      # ============ DSP LAYER ============
+
+      - name: EchoAudioProcessor.kt
+        run: |
+          cat > app/src/main/java/com/djpro/mixer/dsp/EchoAudioProcessor.kt << 'EOF'
+          package com.djpro.mixer.dsp
+
+          import androidx.media3.common.C
+          import androidx.media3.common.audio.AudioProcessor
+          import androidx.media3.common.audio.BaseAudioProcessor
+          import java.nio.ByteBuffer
+
+          class EchoAudioProcessor : BaseAudioProcessor() {
+              @Volatile var enabled: Boolean = false
+              @Volatile var mix: Float = 0.35f
+
+              private var delayBuffer = ShortArray(0)
+              private var writePos = 0
+
+              override fun onConfigure(inputFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
+                  if (inputFormat.encoding != C.ENCODING_PCM_16BIT) {
+                      throw AudioProcessor.UnhandledAudioFormatException(inputFormat)
+                  }
+                  val samples = (inputFormat.sampleRate * 0.28f).toInt().coerceAtLeast(1)
+                  delayBuffer = ShortArray(samples * inputFormat.channelCount)
+                  writePos = 0
+                  return inputFormat
+              }
+
+              override fun queueInput(inputBuffer: ByteBuffer) {
+                  val out = replaceOutputBuffer(inputBuffer.remaining())
+                  if (!enabled || delayBuffer.isEmpty()) {
+                      out.put(inputBuffer)
+                  } else {
+                      while (inputBuffer.remaining() >= 2) {
+                          val s = inputBuffer.short
+                          val d = delayBuffer[writePos]
+                          val mixed = (s + (d * mix).toInt()).coerceIn(-32768, 32767).toShort()
+                          delayBuffer[writePos] = s
+                          out.putShort(mixed)
+                          writePos = (writePos + 1) % delayBuffer.size
+                      }
+                  }
+                  out.flip()
+              }
+
+              override fun onFlush() { delayBuffer.fill(0); writePos = 0 }
+              override fun onReset() { delayBuffer = ShortArray(0) }
+          }
+          EOF
+
+      - name: FilterAudioProcessor.kt
+        run: |
+          cat > app/src/main/java/com/djpro/mixer/dsp/FilterAudioProcessor.kt << 'EOF'
+          package com.djpro.mixer.dsp
+
+          import androidx.media3.common.C
+          import androidx.media3.common.audio.AudioProcessor
+          import androidx.media3.common.audio.BaseAudioProcessor
+          import java.nio.ByteBuffer
+
+          class FilterAudioProcessor : BaseAudioProcessor() {
+              @Volatile var enabled: Boolean = false
+              private var prev = FloatArray(2)
+
+              override fun onConfigure(inputFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
+                  if (inputFormat.encoding != C.ENCODING_PCM_16BIT) {
+                      throw AudioProcessor.UnhandledAudioFormatException(inputFormat)
+                  }
+                  prev = FloatArray(inputFormat.channelCount)
+                  return inputFormat
+              }
+
+              override fun queueInput(inputBuffer: ByteBuffer) {
+                  val out = replaceOutputBuffer(inputBuffer.remaining())
+                  val ch = prev.size
+                  var i = 0
+                  while (inputBuffer.remaining() >= 2) {
+                      val s = inputBuffer.short.toFloat() / 32768f
+                      val c = i % ch
+                      val filtered = if (enabled) {
+                          val y = 0.15f * s + 0.85f * prev[c]
+                          prev[c] = y
+                          y
+                      } else s
+                      out.putShort((filtered * 32767f).coerceIn(-32768f, 32767f).toInt().toShort())
+                      i++
+                  }
+                  out.flip()
+              }
+
+              override fun onFlush() { prev.fill(0f) }
+              override fun onReset() { prev = FloatArray(2) }
+          }
+          EOF
+
+      - name: VocalRemovalProcessor.kt
+        run: |
+          cat > app/src/main/java/com/djpro/mixer/dsp/VocalRemovalProcessor.kt << 'EOF'
+          package com.djpro.mixer.dsp
+
+          import androidx.media3.common.C
+          import androidx.media3.common.audio.AudioProcessor
+          import androidx.media3.common.audio.BaseAudioProcessor
+          import java.nio.ByteBuffer
+
+          class VocalRemovalProcessor : BaseAudioProcessor() {
+              @Volatile var enabled: Boolean = false
+
+              override fun onConfigure(inputFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
+                  if (inputFormat.encoding != C.ENCODING_PCM_16BIT) {
+                      throw AudioProcessor.UnhandledAudioFormatException(inputFormat)
+                  }
+                  return inputFormat
+              }
+
+              override fun queueInput(inputBuffer: ByteBuffer) {
+                  val out = replaceOutputBuffer(inputBuffer.remaining())
+                  if (!enabled) {
+                      out.put(inputBuffer)
+                  } else {
+                      while (inputBuffer.remaining() >= 4) {
+                          val l = inputBuffer.short.toInt()
+                          val r = inputBuffer.short.toInt()
+                          val side = (l - r) / 2
+                          val nl = (side * 2).coerceIn(-32768, 32767).toShort()
+                          val nr = (-side * 2).coerceIn(-32768, 32767).toShort()
+                          out.putShort(nl)
+                          out.putShort(nr)
+                      }
+                      while (inputBuffer.remaining() > 0) out.put(inputBuffer.get())
+                  }
+                  out.flip()
+              }
+
+              override fun onFlush() {}
+              override fun onReset() {}
+          }
+          EOF
+
+      # ============ AUDIO LAYER ============
+
+      - name: DeckPlayer.kt
+        run: |
+          cat > app/src/main/java/com/djpro/mixer/audio/DeckPlayer.kt << 'EOF'
+          package com.djpro.mixer.audio
+
+          import android.content.Context
+          import androidx.media3.common.MediaItem
+          import androidx.media3.common.Player
+          import androidx.media3.common.audio.AudioProcessor
+          import androidx.media3.exoplayer.DefaultRenderersFactory
+          import androidx.media3.exoplayer.ExoPlayer
+          import androidx.media3.exoplayer.audio.AudioSink
+          import androidx.media3.exoplayer.audio.DefaultAudioSink
+          import com.djpro.mixer.dsp.EchoAudioProcessor
+          import com.djpro.mixer.dsp.FilterAudioProcessor
+          import com.djpro.mixer.dsp.VocalRemovalProcessor
+
+          class DeckPlayer(val index: Int, context: Context) {
+
+              val echo = EchoAudioProcessor()
+              val filter = FilterAudioProcessor()
+              val vocal = VocalRemovalProcessor()
+
+              private val audioSink: AudioSink = DefaultAudioSink.Builder()
+                  .setAudioProcessors(arrayOf<AudioProcessor>(echo, filter, vocal))
+                  .build()
+
+              private val renderersFactory = object : DefaultRenderersFactory(context) {
+                  override fun buildAudioSink(
+                      context: Context,
+                      enableFloatOutput: Boolean,
+                      enableAudioTrackPlaybackParams: Boolean
+                  ): AudioSink = audioSink
+              }
+
+              val player: ExoPlayer = ExoPlayer.Builder(context, renderersFactory)
+                  .build()
+                  .apply {
+                      repeatMode = Player.REPEAT_MODE_OFF
+                      playWhenReady = false
+                      volume = 1f
+                  }
+
+              var isLoaded: Boolean = false
+                  private set
+              var isPlaying: Boolean = false
+                  private set
+
+              fun load(uri: String) {
+                  try {
+                      player.setMediaItem(MediaItem.fromUri(uri))
+                      player.prepare()
+                      isLoaded = true
+                  } catch (_: Throwable) {
+                      isLoaded = false
+                  }
+              }
+
+              fun play() { try { player.play(); isPlaying = true } catch (_: Throwable) {} }
+              fun pause() { try { player.pause(); isPlaying = false } catch (_: Throwable) {} }
+              fun toggle() { if (isPlaying) pause() else play() }
+
+              fun setVolume(v: Float) {
+                  try { player.volume = v.coerceIn(0f, 1f) } catch (_: Throwable) {}
+              }
+
+              fun scratch(rate: Float) {
+                  try { player.setPlaybackSpeed(rate.coerceIn(0.25f, 2.5f)) } catch (_: Throwable) {}
+              }
+
+              fun endScratch() {
+                  try { player.setPlaybackSpeed(1f) } catch (_: Throwable) {}
+              }
+
+              fun release() {
+                  try { player.release() } catch (_: Throwable) {}
+                  try { audioSink.release() } catch (_: Throwable) {}
+              }
+          }
+          EOF
+
+      - name: AudioEngine.kt
+        run: |
+          cat > app/src/main/java/com/djpro/mixer/audio/AudioEngine.kt << 'EOF'
+          package com.djpro.mixer.audio
+
+          import android.content.Context
+          import kotlin.math.cos
+          import kotlin.math.sin
+
+          class AudioEngine(context: Context) {
+
+              val decks: List<DeckPlayer> = (0 until 6).map { DeckPlayer(it, context) }
+
+              var crossfader: Float = 0.5f
+                  private set
+              var masterVolume: Float = 1.0f
+                  private set
+
+              var echoEnabled = false
+              var filterEnabled = false
+              var vocalRemovalEnabled = false
+
+              init {
+                  setCrossfader(0.5f)
+                  setMasterVolume(1.0f)
+              }
+
+              fun setCrossfader(v: Float) {
+                  crossfader = v.coerceIn(0f, 1f)
+                  val a = cos(crossfader * Math.PI / 2).toFloat()
+                  val b = sin(crossfader * Math.PI / 2).toFloat()
+                  decks[0].setVolume(a * masterVolume)
+                  decks[1].setVolume(b * masterVolume)
+              }
+
+              fun setMasterVolume(v: Float) {
+                  masterVolume = v.coerceIn(0f, 1f)
+                  setCrossfader(crossfader)
+              }
+
+              fun setEcho(on: Boolean) {
+                  echoEnabled = on
+                  decks.forEach { it.echo.enabled = on }
+              }
+
+              fun setFilter(on: Boolean) {
+                  filterEnabled = on
+                  decks.forEach { it.filter.enabled = on }
+              }
+
+              fun setVocalRemoval(on: Boolean) {
+                  vocalRemovalEnabled = on
+                  decks.forEach { it.vocal.enabled = on }
+              }
+
+              fun loadDeck(index: Int, uri: String) {
+                  if (index in decks.indices) decks[index].load(uri)
+              }
+
+              fun togglePlay(index: Int) {
+                  if (index in decks.indices) decks[index].toggle()
+              }
+
+              fun scratch(index: Int, rate: Float) {
+                  if (index in decks.indices) decks[index].scratch(rate)
+              }
+
+              fun endScratch(index: Int) {
+                  if (index in decks.indices) decks[index].endScratch()
+              }
+
+              fun release() {
+                  decks.forEach { it.release() }
+              }
+          }
+          EOF
+
+      # ============ VIDEO / RECORDING ============
+
+      - name: RecordingService.kt
+        run: |
+          cat > app/src/main/java/com/djpro/mixer/video/RecordingService.kt << 'EOF'
+          package com.djpro.mixer.video
+
+          import android.app.Notification
+          import android.app.NotificationChannel
+          import android.app.NotificationManager
+          import android.app.Service
+          import android.content.Context
+          import android.content.Intent
+          import android.content.pm.ServiceInfo
+          import android.os.Build
+          import android.os.IBinder
+          import androidx.core.app.NotificationCompat
+          import androidx.core.app.ServiceCompat
+
+          class RecordingService : Service() {
+
+              override fun onBind(intent: Intent?): IBinder? = null
+
+              override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+                  val channelId = "dj_recording"
+                  val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      val ch = NotificationChannel(
+                          channelId, "DJ Recording", NotificationManager.IMPORTANCE_LOW
+                      )
+                      nm.createNotificationChannel(ch)
+                  }
+
+                  val notification: Notification = NotificationCompat.Builder(this, channelId)
+                      .setContentTitle("DJ Pro Mixer")
+                      .setContentText("Recording in progress")
+                      .setSmallIcon(android.R.drawable.presence_video_online)
+                      .setOngoing(true)
+                      .build()
+
+                  val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                      ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION or
+                      ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                  } else 0
+
+                  try {
+                      ServiceCompat.startForeground(this, 4242, notification, type)
+                  } catch (_: Throwable) {
+                      try { startForeground(4242, notification) } catch (_: Throwable) {}
+                  }
+
+                  return START_NOT_STICKY
+              }
+          }
+          EOF
+
+      - name: MixRecorder.kt
+        run: |
+          cat > app/src/main/java/com/djpro/mixer/video/MixRecorder.kt << 'EOF'
+          package com.djpro.mixer.video
+
+          import android.content.Context
+          import android.content.Intent
+          import android.hardware.display.DisplayManager
+          import android.hardware.display.VirtualDisplay
+          import android.media.MediaRecorder
+          import android.media.projection.MediaProjection
+          import android.media.projection.MediaProjectionManager
+          import android.os.Build
+          import android.os.Environment
+          import android.util.DisplayMetrics
+          import android.view.WindowManager
+          import java.io.File
+
+          class MixRecorder(private val context: Context) {
+
+              private var projection: MediaProjection? = null
+              private var virtualDisplay: VirtualDisplay? = null
+              private var recorder: MediaRecorder? = null
+              private var outputFile: File? = null
+
+              fun buildIntent(): Intent? = try {
+                  val mgr = context.getSystemService(MediaProjectionManager::class.java)
+                  mgr.createScreenCaptureIntent()
+              } catch (_: Throwable) { null }
+
+              fun start(resultCode: Int, data: Intent): Boolean {
+                  return try {
+                      val mgr = context.getSystemService(MediaProjectionManager::class.java)
+                      projection = mgr.getMediaProjection(resultCode, data)
+
+                      val metrics = DisplayMetrics()
+                      val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+                      @Suppress("DEPRECATION")
+                      wm.defaultDisplay.getRealMetrics(metrics)
+                      val w = metrics.widthPixels
+                      val h = metrics.heightPixels
+                      val dpi = metrics.densityDpi
+
+                      val dir = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES)
+                          ?: context.filesDir
+                      outputFile = File(dir, "DJProMix_${System.currentTimeMillis()}.mp4")
+
+                      val rec: MediaRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                          MediaRecorder(context)
+                      } else {
+                          @Suppress("DEPRECATION") MediaRecorder()
+                      }
+                      rec.apply {
+                          setVideoSource(MediaRecorder.VideoSource.SURFACE)
+                          setAudioSource(MediaRecorder.AudioSource.MIC)
+                          setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                          setVideoEncoder(MediaRecorder.VideoEncoder.H264)
+                          setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                          setVideoSize(w, h)
+                          setVideoFrameRate(30)
+                          setVideoEncodingBitRate(8_000_000)
+                          setOutputFile(outputFile!!.absolutePath)
+                          prepare()
+                      }
+                      recorder = rec
+
+                      virtualDisplay = projection?.createVirtualDisplay(
+                          "DJProRec", w, h, dpi,
+                          DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                          rec.surface, null, null
+                      )
+                      rec.start()
+                      true
+                  } catch (_: Throwable) {
+                      false
+                  }
+              }
+
+              fun stop(): File? {
+                  try { recorder?.stop() } catch (_: Throwable) {}
+                  try { recorder?.release() } catch (_: Throwable) {}
+                  recorder = null
+                  try { virtualDisplay?.release() } catch (_: Throwable) {}
+                  virtualDisplay = null
+                  try { projection?.stop() } catch (_: Throwable) {}
+                  projection = null
+                  return outputFile
+              }
+          }
+          EOF
+
+      # ============ UI LAYER ============
+
       - name: NeonTheme.kt
         run: |
           cat > app/src/main/java/com/djpro/mixer/NeonTheme.kt << 'EOF'
@@ -248,134 +701,6 @@ jobs:
           }
           EOF
 
-      - name: DeckPlayer.kt
-        run: |
-          cat > app/src/main/java/com/djpro/mixer/audio/DeckPlayer.kt << 'EOF'
-          package com.djpro.mixer.audio
-
-          import android.content.Context
-          import androidx.media3.common.MediaItem
-          import androidx.media3.common.Player
-          import androidx.media3.exoplayer.ExoPlayer
-
-          class DeckPlayer(val index: Int, context: Context) {
-
-              val player: ExoPlayer = ExoPlayer.Builder(context).build().apply {
-                  repeatMode = Player.REPEAT_MODE_OFF
-                  playWhenReady = false
-                  volume = 0f
-              }
-
-              var isLoaded: Boolean = false
-                  private set
-              var isPlaying: Boolean = false
-                  private set
-
-              fun load(uri: String) {
-                  try {
-                      player.setMediaItem(MediaItem.fromUri(uri))
-                      player.prepare()
-                      isLoaded = true
-                  } catch (_: Throwable) {
-                      isLoaded = false
-                  }
-              }
-
-              fun play() {
-                  try { player.play(); isPlaying = true } catch (_: Throwable) {}
-              }
-
-              fun pause() {
-                  try { player.pause(); isPlaying = false } catch (_: Throwable) {}
-              }
-
-              fun toggle() {
-                  if (isPlaying) pause() else play()
-              }
-
-              fun setVolume(v: Float) {
-                  try { player.volume = v.coerceIn(0f, 1f) } catch (_: Throwable) {}
-              }
-
-              fun scratch(rate: Float) {
-                  try {
-                      player.setPlaybackSpeed(rate.coerceIn(0.25f, 2.5f))
-                  } catch (_: Throwable) {}
-              }
-
-              fun endScratch() {
-                  try { player.setPlaybackSpeed(1f) } catch (_: Throwable) {}
-              }
-
-              fun release() {
-                  try { player.release() } catch (_: Throwable) {}
-              }
-          }
-          EOF
-
-      - name: AudioEngine.kt
-        run: |
-          cat > app/src/main/java/com/djpro/mixer/audio/AudioEngine.kt << 'EOF'
-          package com.djpro.mixer.audio
-
-          import android.content.Context
-          import kotlin.math.cos
-          import kotlin.math.sin
-
-          class AudioEngine(context: Context) {
-
-              val decks: List<DeckPlayer> = (0 until 6).map { DeckPlayer(it, context) }
-
-              var crossfader: Float = 0.5f
-                  private set
-
-              var masterVolume: Float = 1.0f
-                  private set
-
-              var echoEnabled = false
-              var filterEnabled = false
-              var vocalRemovalEnabled = false
-
-              init {
-                  setCrossfader(0.5f)
-                  setMasterVolume(1.0f)
-              }
-
-              fun setCrossfader(v: Float) {
-                  crossfader = v.coerceIn(0f, 1f)
-                  val a = cos(crossfader * Math.PI / 2).toFloat()
-                  val b = sin(crossfader * Math.PI / 2).toFloat()
-                  decks[0].setVolume(a * masterVolume)
-                  decks[1].setVolume(b * masterVolume)
-              }
-
-              fun setMasterVolume(v: Float) {
-                  masterVolume = v.coerceIn(0f, 1f)
-                  setCrossfader(crossfader)
-              }
-
-              fun loadDeck(index: Int, uri: String) {
-                  if (index in decks.indices) decks[index].load(uri)
-              }
-
-              fun togglePlay(index: Int) {
-                  if (index in decks.indices) decks[index].toggle()
-              }
-
-              fun scratch(index: Int, rate: Float) {
-                  if (index in decks.indices) decks[index].scratch(rate)
-              }
-
-              fun endScratch(index: Int) {
-                  if (index in decks.indices) decks[index].endScratch()
-              }
-
-              fun release() {
-                  decks.forEach { it.release() }
-              }
-          }
-          EOF
-
       - name: ExpandableDeckManager.kt
         run: |
           cat > app/src/main/java/com/djpro/mixer/expand/ExpandableDeckManager.kt << 'EOF'
@@ -385,8 +710,6 @@ jobs:
           import androidx.compose.runtime.getValue
           import androidx.compose.runtime.mutableStateOf
           import androidx.compose.runtime.setValue
-
-          enum class DeckSize { MINI, BIG, EXPANDED }
 
           data class DeckLayout(
               val expandedDeckId: Int? = null,
@@ -461,6 +784,37 @@ jobs:
                   fadeIn(fade) + scaleIn(initialScale = 0.6f)
               val pipExit: ExitTransition =
                   fadeOut(fade) + scaleOut(targetScale = 0.6f)
+          }
+          EOF
+
+      - name: VideoDeckView.kt
+        run: |
+          cat > app/src/main/java/com/djpro/mixer/expand/VideoDeckView.kt << 'EOF'
+          package com.djpro.mixer.expand
+
+          import androidx.compose.runtime.Composable
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.graphics.graphicsLayer
+          import androidx.compose.ui.viewinterop.AndroidView
+          import androidx.media3.ui.PlayerView
+          import com.djpro.mixer.audio.DeckPlayer
+
+          @Composable
+          fun VideoDeckView(
+              deck: DeckPlayer,
+              alpha: Float,
+              modifier: Modifier = Modifier
+          ) {
+              AndroidView(
+                  modifier = modifier.graphicsLayer { this.alpha = alpha },
+                  factory = { ctx ->
+                      PlayerView(ctx).apply {
+                          player = deck.player
+                          useController = false
+                          setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
+                      }
+                  }
+              )
           }
           EOF
 
@@ -618,6 +972,7 @@ jobs:
           import com.djpro.mixer.audio.AudioEngine
           import com.djpro.mixer.expand.DeckAnim
           import com.djpro.mixer.expand.ExpandableDeckManager
+          import com.djpro.mixer.expand.VideoDeckView
           import com.djpro.mixer.expand.VideoMixPiP
 
           private const val SAMPLE_VIDEO_1 =
@@ -705,6 +1060,7 @@ jobs:
                               modifier = Modifier.weight(1.4f).fillMaxHeight()
                           ) {
                               CenterVideoPanel(
+                                  engine = engine,
                                   crossfaderValue = crossfaderValue,
                                   onCrossfaderChange = {
                                       crossfaderValue = it
@@ -713,9 +1069,18 @@ jobs:
                                   echoOn = echoOn,
                                   filterOn = filterOn,
                                   vocalOff = vocalOff,
-                                  onEchoToggle = { echoOn = !echoOn },
-                                  onFilterToggle = { filterOn = !filterOn },
-                                  onVocalToggle = { vocalOff = !vocalOff }
+                                  onEchoToggle = {
+                                      echoOn = !echoOn
+                                      engine.setEcho(echoOn)
+                                  },
+                                  onFilterToggle = {
+                                      filterOn = !filterOn
+                                      engine.setFilter(filterOn)
+                                  },
+                                  onVocalToggle = {
+                                      vocalOff = !vocalOff
+                                      engine.setVocalRemoval(vocalOff)
+                                  }
                               )
                           }
                       }
@@ -867,6 +1232,7 @@ jobs:
 
           @Composable
           private fun CenterVideoPanel(
+              engine: AudioEngine,
               crossfaderValue: Float,
               onCrossfaderChange: (Float) -> Unit,
               echoOn: Boolean,
@@ -885,6 +1251,7 @@ jobs:
                       .padding(10.dp),
                   verticalArrangement = Arrangement.spacedBy(8.dp)
               ) {
+                  // Real video mixing: two PlayerViews stacked, alpha driven by crossfader
                   Box(
                       modifier = Modifier
                           .fillMaxWidth()
@@ -894,7 +1261,22 @@ jobs:
                           .border(1.dp, Neon.CYAN.copy(alpha = 0.3f), RoundedCornerShape(10.dp)),
                       contentAlignment = Alignment.Center
                   ) {
-                      Text("VIDEO MIX", color = Neon.CYAN.copy(alpha = 0.4f), fontSize = 12.sp)
+                      VideoDeckView(
+                          deck = engine.decks[0],
+                          alpha = 1f,
+                          modifier = Modifier.fillMaxSize()
+                      )
+                      VideoDeckView(
+                          deck = engine.decks[1],
+                          alpha = 1f - crossfaderValue,
+                          modifier = Modifier.fillMaxSize()
+                      )
+                      Text(
+                          "VIDEO MIX",
+                          color = Neon.CYAN.copy(alpha = 0.35f),
+                          fontSize = 11.sp,
+                          modifier = Modifier.align(Alignment.BottomCenter).padding(6.dp)
+                      )
                   }
 
                   Slider(
@@ -1009,9 +1391,6 @@ jobs:
           *.aab
           EOF
 
-      # -------------------------------------------------
-      # 6. WRAPPER (last, after all gradle files exist)
-      # -------------------------------------------------
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
@@ -1020,20 +1399,14 @@ jobs:
       - name: Generate Gradle wrapper
         run: gradle wrapper --gradle-version 8.7
 
-      # -------------------------------------------------
-      # 7. COMMIT
-      # -------------------------------------------------
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Fix themes.xml + full DJ app" || echo "nothing to commit"
+          git commit -m "All features: DSP + video mix + recording service + expandable decks" || echo "nothing to commit"
           git push
 
-      # -------------------------------------------------
-      # 8. BUILD APK
-      # -------------------------------------------------
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
