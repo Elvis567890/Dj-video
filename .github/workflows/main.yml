@@ -196,6 +196,8 @@ jobs:
           </manifest>
           EOF
 
+      - name: themes.xml
+        run: |
           cat > app/src/main/res/values/themes.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
@@ -203,11 +205,12 @@ jobs:
                   <item name="android:windowBackground">#05050A</item>
                   <item name="android:statusBarColor">#000000</item>
                   <item name="android:navigationBarColor">#000000</item>
-                  <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="p">shortEdges</item>
               </style>
           </resources>
           EOF
 
+      - name: strings.xml
+        run: |
           cat > app/src/main/res/values/strings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
@@ -254,13 +257,7 @@ jobs:
           import androidx.media3.common.MediaItem
           import androidx.media3.common.Player
           import androidx.media3.exoplayer.ExoPlayer
-          import kotlin.math.cos
-          import kotlin.math.sin
 
-          /**
-           * A single DJ deck backed by ExoPlayer.
-           * Supports load / play / pause / scratch / volume.
-           */
           class DeckPlayer(val index: Int, context: Context) {
 
               val player: ExoPlayer = ExoPlayer.Builder(context).build().apply {
@@ -325,10 +322,6 @@ jobs:
           import kotlin.math.cos
           import kotlin.math.sin
 
-          /**
-           * 6-deck audio engine with crossfader between deck 0 and deck 1.
-           * Pure Kotlin, no native code — safe to build everywhere.
-           */
           class AudioEngine(context: Context) {
 
               val decks: List<DeckPlayer> = (0 until 6).map { DeckPlayer(it, context) }
@@ -344,7 +337,6 @@ jobs:
               var vocalRemovalEnabled = false
 
               init {
-                  // Initialize gain for all decks
                   setCrossfader(0.5f)
                   setMasterVolume(1.0f)
               }
@@ -355,7 +347,6 @@ jobs:
                   val b = sin(crossfader * Math.PI / 2).toFloat()
                   decks[0].setVolume(a * masterVolume)
                   decks[1].setVolume(b * masterVolume)
-                  // decks 2..5 keep their own volume set externally
               }
 
               fun setMasterVolume(v: Float) {
@@ -458,7 +449,6 @@ jobs:
 
           import androidx.compose.animation.EnterTransition
           import androidx.compose.animation.ExitTransition
-          import androidx.compose.animation.core.spring
           import androidx.compose.animation.core.tween
           import androidx.compose.animation.fadeIn
           import androidx.compose.animation.fadeOut
@@ -630,9 +620,9 @@ jobs:
           import com.djpro.mixer.expand.ExpandableDeckManager
           import com.djpro.mixer.expand.VideoMixPiP
 
-          private val SAMPLE_VIDEO_1 =
+          private const val SAMPLE_VIDEO_1 =
               "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
-          private val SAMPLE_VIDEO_2 =
+          private const val SAMPLE_VIDEO_2 =
               "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
 
           @Composable
@@ -650,7 +640,6 @@ jobs:
                       .background(Neon.BG)
                       .padding(8.dp)
               ) {
-                  // ---- Top bar ----
                   Row(
                       modifier = Modifier
                           .fillMaxWidth()
@@ -679,7 +668,6 @@ jobs:
 
                   Spacer(Modifier.height(6.dp))
 
-                  // ---- Main area ----
                   Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
                       Row(
                           modifier = Modifier.fillMaxSize(),
@@ -746,7 +734,6 @@ jobs:
 
                   Spacer(Modifier.height(8.dp))
 
-                  // ---- Bottom row mini decks ----
                   Row(
                       modifier = Modifier.fillMaxWidth().height(140.dp),
                       horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1041,7 +1028,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Full DJ Pro Mixer app" || echo "nothing to commit"
+          git commit -m "Fix themes.xml + full DJ app" || echo "nothing to commit"
           git push
 
       # -------------------------------------------------
