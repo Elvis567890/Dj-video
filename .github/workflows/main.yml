@@ -26,7 +26,6 @@ jobs:
       - name: Create directories
         run: |
           mkdir -p gradle/wrapper
-          mkdir -p app/src/main/java/com/djpro/mixer/expand
           mkdir -p app/src/main/java/com/djpro/mixer/audio
           mkdir -p app/src/main/java/com/djpro/mixer/dsp
           mkdir -p app/src/main/java/com/djpro/mixer/video
@@ -79,34 +78,27 @@ jobs:
               id("com.android.application")
               id("org.jetbrains.kotlin.android")
           }
-
           android {
               namespace = "com.djpro.mixer"
               compileSdk = 34
-
               defaultConfig {
                   applicationId = "com.djpro.mixer"
                   minSdk = 26
                   targetSdk = 34
-                  versionCode = 6
-                  versionName = "2.1.0"
+                  versionCode = 11
+                  versionName = "5.0.0"
               }
-
               buildTypes { release { isMinifyEnabled = false } }
-
               compileOptions {
                   sourceCompatibility = JavaVersion.VERSION_17
                   targetCompatibility = JavaVersion.VERSION_17
               }
-
               kotlinOptions {
                   jvmTarget = "17"
                   freeCompilerArgs += listOf("-Xjvm-default=all")
               }
-
               buildFeatures { compose = true }
               composeOptions { kotlinCompilerExtensionVersion = "1.5.14" }
-
               packaging {
                   resources {
                       excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -115,51 +107,39 @@ jobs:
                       excludes += "/META-INF/NOTICE*"
                   }
               }
-
               lint { abortOnError = false; checkReleaseBuilds = false }
           }
-
           dependencies {
               implementation("androidx.core:core-ktx:1.13.1")
               implementation("androidx.appcompat:appcompat:1.7.0")
               implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
-              implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
               implementation("androidx.activity:activity-compose:1.9.1")
-
               implementation(platform("androidx.compose:compose-bom:2024.09.00"))
               implementation("androidx.compose.ui:ui")
               implementation("androidx.compose.ui:ui-graphics")
-              implementation("androidx.compose.ui:ui-tooling-preview")
               implementation("androidx.compose.material3:material3")
               implementation("androidx.compose.material:material-icons-extended")
-
               implementation("androidx.media3:media3-exoplayer:1.4.1")
               implementation("androidx.media3:media3-ui:1.4.1")
               implementation("androidx.media3:media3-common:1.4.1")
-              implementation("androidx.media3:media3-session:1.4.1")
-
               implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
           }
           EOF
 
-      - name: AndroidManifest.xml
+      - name: Manifest + resources
         run: |
           cat > app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
               xmlns:tools="http://schemas.android.com/tools">
-
               <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
               <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
-              <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
-                  android:maxSdkVersion="32" />
+              <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="android.permission.RECORD_AUDIO" />
               <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
               <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
               <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-              <uses-permission android:name="android.permission.WAKE_LOCK" />
-
               <application
                   android:allowBackup="true"
                   android:label="DJ Pro Mixer"
@@ -168,23 +148,19 @@ jobs:
                   android:hardwareAccelerated="true"
                   android:theme="@style/Theme.DJPro"
                   tools:ignore="GoogleAppIndexingWarning,UnusedAttribute">
-
                   <activity
                       android:name=".MainActivity"
                       android:exported="true"
                       android:screenOrientation="landscape"
                       android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
-                      android:launchMode="singleTop"
                       tools:ignore="LockedOrientationActivity">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
                           <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
                   </activity>
-
                   <service
                       android:name=".video.RecordingService"
-                      android:enabled="true"
                       android:exported="false"
                       android:foregroundServiceType="mediaProjection|microphone"
                       tools:ignore="ForegroundServicePermission" />
@@ -192,8 +168,6 @@ jobs:
           </manifest>
           EOF
 
-      - name: themes.xml
-        run: |
           cat > app/src/main/res/values/themes.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
@@ -205,145 +179,98 @@ jobs:
           </resources>
           EOF
 
-      - name: strings.xml
-        run: |
           cat > app/src/main/res/values/strings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <string name="app_name">DJ Pro Mixer</string>
-          </resources>
+          <resources><string name="app_name">DJ Pro Mixer</string></resources>
           EOF
 
-      # ==================== DSP ====================
-
-      - name: EchoAudioProcessor.kt
+      - name: DSP files
         run: |
           cat > app/src/main/java/com/djpro/mixer/dsp/EchoAudioProcessor.kt << 'EOF'
           package com.djpro.mixer.dsp
-
           import androidx.media3.common.C
           import androidx.media3.common.audio.AudioProcessor
           import androidx.media3.common.audio.BaseAudioProcessor
           import java.nio.ByteBuffer
-
           class EchoAudioProcessor : BaseAudioProcessor() {
               @Volatile var enabled: Boolean = false
               @Volatile var mix: Float = 0.35f
               private var delayBuffer = ShortArray(0)
               private var writePos = 0
-
               override fun onConfigure(inputFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
-                  if (inputFormat.encoding != C.ENCODING_PCM_16BIT) {
-                      throw AudioProcessor.UnhandledAudioFormatException(inputFormat)
-                  }
+                  if (inputFormat.encoding != C.ENCODING_PCM_16BIT) throw AudioProcessor.UnhandledAudioFormatException(inputFormat)
                   val samples = (inputFormat.sampleRate * 0.28f).toInt().coerceAtLeast(1)
-                  delayBuffer = ShortArray(samples * inputFormat.channelCount)
-                  writePos = 0
+                  delayBuffer = ShortArray(samples * inputFormat.channelCount); writePos = 0
                   return inputFormat
               }
-
               override fun queueInput(inputBuffer: ByteBuffer) {
                   val out = replaceOutputBuffer(inputBuffer.remaining())
-                  if (!enabled || delayBuffer.isEmpty()) {
-                      out.put(inputBuffer)
-                  } else {
-                      while (inputBuffer.remaining() >= 2) {
-                          val s = inputBuffer.short
-                          val d = delayBuffer[writePos]
-                          val mixed = (s + (d * mix).toInt()).coerceIn(-32768, 32767).toShort()
-                          delayBuffer[writePos] = s
-                          out.putShort(mixed)
-                          writePos = (writePos + 1) % delayBuffer.size
-                      }
+                  if (!enabled || delayBuffer.isEmpty()) out.put(inputBuffer)
+                  else while (inputBuffer.remaining() >= 2) {
+                      val s = inputBuffer.short; val d = delayBuffer[writePos]
+                      val mixed = (s + (d * mix).toInt()).coerceIn(-32768, 32767).toShort()
+                      delayBuffer[writePos] = s; out.putShort(mixed)
+                      writePos = (writePos + 1) % delayBuffer.size
                   }
                   out.flip()
               }
-
               override fun onFlush() { delayBuffer.fill(0); writePos = 0 }
               override fun onReset() { delayBuffer = ShortArray(0) }
           }
           EOF
 
-      - name: FilterAudioProcessor.kt
-        run: |
           cat > app/src/main/java/com/djpro/mixer/dsp/FilterAudioProcessor.kt << 'EOF'
           package com.djpro.mixer.dsp
-
           import androidx.media3.common.C
           import androidx.media3.common.audio.AudioProcessor
           import androidx.media3.common.audio.BaseAudioProcessor
           import java.nio.ByteBuffer
-
           class FilterAudioProcessor : BaseAudioProcessor() {
               @Volatile var enabled: Boolean = false
               @Volatile var depth: Float = 0.15f
               private var prev = FloatArray(2)
-
               override fun onConfigure(inputFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
-                  if (inputFormat.encoding != C.ENCODING_PCM_16BIT) {
-                      throw AudioProcessor.UnhandledAudioFormatException(inputFormat)
-                  }
-                  prev = FloatArray(inputFormat.channelCount)
-                  return inputFormat
+                  if (inputFormat.encoding != C.ENCODING_PCM_16BIT) throw AudioProcessor.UnhandledAudioFormatException(inputFormat)
+                  prev = FloatArray(inputFormat.channelCount); return inputFormat
               }
-
               override fun queueInput(inputBuffer: ByteBuffer) {
                   val out = replaceOutputBuffer(inputBuffer.remaining())
-                  val ch = prev.size
-                  var i = 0
+                  val ch = prev.size; var i = 0
                   val a = depth.coerceIn(0.01f, 1f)
                   while (inputBuffer.remaining() >= 2) {
                       val s = inputBuffer.short.toFloat() / 32768f
                       val c = i % ch
-                      val filtered = if (enabled) {
-                          val y = a * s + (1 - a) * prev[c]
-                          prev[c] = y
-                          y
-                      } else s
-                      out.putShort((filtered * 32767f).coerceIn(-32768f, 32767f).toInt().toShort())
-                      i++
+                      val filtered = if (enabled) { val y = a * s + (1 - a) * prev[c]; prev[c] = y; y } else s
+                      out.putShort((filtered * 32767f).coerceIn(-32768f, 32767f).toInt().toShort()); i++
                   }
                   out.flip()
               }
-
               override fun onFlush() { prev.fill(0f) }
               override fun onReset() { prev = FloatArray(2) }
           }
           EOF
 
-      - name: VocalRemovalProcessor.kt
-        run: |
           cat > app/src/main/java/com/djpro/mixer/dsp/VocalRemovalProcessor.kt << 'EOF'
           package com.djpro.mixer.dsp
-
           import androidx.media3.common.C
           import androidx.media3.common.audio.AudioProcessor
           import androidx.media3.common.audio.BaseAudioProcessor
           import java.nio.ByteBuffer
-
           class VocalRemovalProcessor : BaseAudioProcessor() {
               @Volatile var enabled: Boolean = false
-
               override fun onConfigure(inputFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
-                  if (inputFormat.encoding != C.ENCODING_PCM_16BIT) {
-                      throw AudioProcessor.UnhandledAudioFormatException(inputFormat)
-                  }
+                  if (inputFormat.encoding != C.ENCODING_PCM_16BIT) throw AudioProcessor.UnhandledAudioFormatException(inputFormat)
                   return inputFormat
               }
-
               override fun queueInput(inputBuffer: ByteBuffer) {
                   val out = replaceOutputBuffer(inputBuffer.remaining())
-                  if (!enabled) {
-                      out.put(inputBuffer)
-                  } else {
+                  if (!enabled) out.put(inputBuffer)
+                  else {
                       while (inputBuffer.remaining() >= 4) {
-                          val l = inputBuffer.short.toInt()
-                          val r = inputBuffer.short.toInt()
+                          val l = inputBuffer.short.toInt(); val r = inputBuffer.short.toInt()
                           val side = (l - r) / 2
-                          val nl = (side * 2).coerceIn(-32768, 32767).toShort()
-                          val nr = (-side * 2).coerceIn(-32768, 32767).toShort()
-                          out.putShort(nl)
-                          out.putShort(nr)
+                          out.putShort((side * 2).coerceIn(-32768, 32767).toShort())
+                          out.putShort((-side * 2).coerceIn(-32768, 32767).toShort())
                       }
                       while (inputBuffer.remaining() > 0) out.put(inputBuffer.get())
                   }
@@ -354,76 +281,83 @@ jobs:
           }
           EOF
 
-      - name: EqProcessor.kt
-        run: |
           cat > app/src/main/java/com/djpro/mixer/dsp/EqProcessor.kt << 'EOF'
           package com.djpro.mixer.dsp
-
           import androidx.media3.common.C
           import androidx.media3.common.audio.AudioProcessor
           import androidx.media3.common.audio.BaseAudioProcessor
           import java.nio.ByteBuffer
           import kotlin.math.pow
-
           class EqProcessor : BaseAudioProcessor() {
-              @Volatile var lowGainDb: Float = 0f
-              @Volatile var midGainDb: Float = 0f
-              @Volatile var highGainDb: Float = 0f
+              @Volatile var lowGainDb = 0f
+              @Volatile var midGainDb = 0f
+              @Volatile var highGainDb = 0f
               private var channels = 2
               private var lowPrev = FloatArray(2)
               private var hpPrevIn = FloatArray(2)
               private var hpPrevOut = FloatArray(2)
               private var lpCoeff = 0f
               private var hpCoeff = 0f
-
               override fun onConfigure(inputFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
-                  if (inputFormat.encoding != C.ENCODING_PCM_16BIT) {
-                      throw AudioProcessor.UnhandledAudioFormatException(inputFormat)
-                  }
+                  if (inputFormat.encoding != C.ENCODING_PCM_16BIT) throw AudioProcessor.UnhandledAudioFormatException(inputFormat)
                   channels = inputFormat.channelCount
                   lowPrev = FloatArray(channels); hpPrevIn = FloatArray(channels); hpPrevOut = FloatArray(channels)
                   val dt = 1f / inputFormat.sampleRate
-                  val rcLp = 1f / (2f * Math.PI.toFloat() * 200f)
-                  lpCoeff = dt / (rcLp + dt)
-                  val rcHp = 1f / (2f * Math.PI.toFloat() * 4000f)
-                  hpCoeff = rcHp / (rcHp + dt)
+                  val rcLp = 1f / (2f * Math.PI.toFloat() * 200f); lpCoeff = dt / (rcLp + dt)
+                  val rcHp = 1f / (2f * Math.PI.toFloat() * 4000f); hpCoeff = rcHp / (rcHp + dt)
                   return inputFormat
               }
-
-              private fun dbToLin(db: Float): Float = if (db == 0f) 1f else 10f.pow(db / 20f)
-
+              private fun dbToLin(db: Float) = if (db == 0f) 1f else 10f.pow(db / 20f)
               override fun queueInput(inputBuffer: ByteBuffer) {
                   val out = replaceOutputBuffer(inputBuffer.remaining())
                   val ch = channels; var i = 0
-                  val lowG = dbToLin(lowGainDb); val midG = dbToLin(midGainDb); val highG = dbToLin(highGainDb)
+                  val lg = dbToLin(lowGainDb); val mg = dbToLin(midGainDb); val hg = dbToLin(highGainDb)
                   while (inputBuffer.remaining() >= 2) {
-                      val s = inputBuffer.short.toFloat() / 32768f
-                      val c = i % ch
-                      lowPrev[c] += lpCoeff * (s - lowPrev[c])
-                      val low = lowPrev[c]
-                      hpPrevOut[c] = hpCoeff * (hpPrevOut[c] + s - hpPrevIn[c])
-                      hpPrevIn[c] = s
-                      val high = hpPrevOut[c]
+                      val s = inputBuffer.short.toFloat() / 32768f; val c = i % ch
+                      lowPrev[c] += lpCoeff * (s - lowPrev[c]); val low = lowPrev[c]
+                      hpPrevOut[c] = hpCoeff * (hpPrevOut[c] + s - hpPrevIn[c]); hpPrevIn[c] = s; val high = hpPrevOut[c]
                       val mid = s - low - high
-                      val y = (low * lowG + mid * midG + high * highG).coerceIn(-1f, 1f)
-                      out.putShort((y * 32767f).toInt().toShort())
-                      i++
+                      val y = (low * lg + mid * mg + high * hg).coerceIn(-1f, 1f)
+                      out.putShort((y * 32767f).toInt().toShort()); i++
                   }
                   out.flip()
               }
-
               override fun onFlush() { lowPrev.fill(0f); hpPrevIn.fill(0f); hpPrevOut.fill(0f) }
               override fun onReset() { lowPrev = FloatArray(2); hpPrevIn = FloatArray(2); hpPrevOut = FloatArray(2) }
           }
           EOF
 
-      # ==================== AUDIO ====================
+          cat > app/src/main/java/com/djpro/mixer/dsp/MasterLimiterProcessor.kt << 'EOF'
+          package com.djpro.mixer.dsp
+          import androidx.media3.common.C
+          import androidx.media3.common.audio.AudioProcessor
+          import androidx.media3.common.audio.BaseAudioProcessor
+          import java.nio.ByteBuffer
+          import kotlin.math.tanh
+          class MasterLimiterProcessor : BaseAudioProcessor() {
+              @Volatile var ceiling: Float = 0.92f
+              override fun onConfigure(inputFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
+                  if (inputFormat.encoding != C.ENCODING_PCM_16BIT) throw AudioProcessor.UnhandledAudioFormatException(inputFormat)
+                  return inputFormat
+              }
+              override fun queueInput(inputBuffer: ByteBuffer) {
+                  val out = replaceOutputBuffer(inputBuffer.remaining())
+                  while (inputBuffer.remaining() >= 2) {
+                      val s = inputBuffer.short.toFloat() / 32768f
+                      val limited = tanh(s).toFloat() * ceiling
+                      out.putShort((limited * 32767f).toInt().toShort())
+                  }
+                  out.flip()
+              }
+              override fun onFlush() {}
+              override fun onReset() {}
+          }
+          EOF
 
       - name: DeckPlayer.kt
         run: |
           cat > app/src/main/java/com/djpro/mixer/audio/DeckPlayer.kt << 'EOF'
           package com.djpro.mixer.audio
-
           import android.content.Context
           import androidx.compose.runtime.getValue
           import androidx.compose.runtime.mutableFloatStateOf
@@ -439,6 +373,7 @@ jobs:
           import com.djpro.mixer.dsp.EchoAudioProcessor
           import com.djpro.mixer.dsp.EqProcessor
           import com.djpro.mixer.dsp.FilterAudioProcessor
+          import com.djpro.mixer.dsp.MasterLimiterProcessor
           import com.djpro.mixer.dsp.VocalRemovalProcessor
           import kotlinx.coroutines.CoroutineScope
           import kotlinx.coroutines.Dispatchers
@@ -447,118 +382,98 @@ jobs:
           import kotlinx.coroutines.launch
 
           class DeckPlayer(val index: Int, context: Context) {
-
               val echo = EchoAudioProcessor()
               val filter = FilterAudioProcessor()
               val vocal = VocalRemovalProcessor()
               val eq = EqProcessor()
-
+              val limiter = MasterLimiterProcessor()
               private val audioSink: AudioSink = DefaultAudioSink.Builder()
-                  .setAudioProcessors(arrayOf<AudioProcessor>(eq, echo, filter, vocal))
-                  .build()
-
+                  .setAudioProcessors(arrayOf<AudioProcessor>(eq, echo, filter, vocal, limiter)).build()
               private val renderersFactory = object : DefaultRenderersFactory(context) {
-                  override fun buildAudioSink(
-                      context: Context,
-                      enableFloatOutput: Boolean,
-                      enableAudioTrackPlaybackParams: Boolean
-                  ): AudioSink = audioSink
+                  override fun buildAudioSink(context: Context, enableFloatOutput: Boolean,
+                                              enableAudioTrackPlaybackParams: Boolean): AudioSink = audioSink
               }
-
-              val player: ExoPlayer = ExoPlayer.Builder(context, renderersFactory)
-                  .build()
-                  .apply {
-                      repeatMode = Player.REPEAT_MODE_OFF
-                      playWhenReady = false
-                      volume = 1f
-                  }
-
+              val player: ExoPlayer = ExoPlayer.Builder(context, renderersFactory).build().apply {
+                  repeatMode = Player.REPEAT_MODE_OFF; playWhenReady = false; volume = 1f
+              }
               var isLoaded by mutableStateOf(false); private set
               var isPlaying by mutableStateOf(false); private set
               var scratching by mutableStateOf(false); private set
               var scratchRate by mutableFloatStateOf(1f); private set
               var scratchVelocity by mutableFloatStateOf(0f); private set
-
-              var bpm: Float = 0f; private set
+              var bpm: Float = 128f; private set
               var loadedName: String = ""; private set
-
               val cuePoints = LongArray(8) { -1L }
               var loopActive by mutableStateOf(false); private set
               var loopBeats = 4; private set
               var loopStartMs = 0L; private set
               var loopEndMs = 0L; private set
-
+              private var scratchStartMs = 0L
+              private var scratchAccumMs = 0L
+              private var wasPlayingBeforeScratch = false
               private val scope = CoroutineScope(Dispatchers.Main + Job())
               private var effectJob: Job? = null
               private var loopJob: Job? = null
 
               fun load(uri: String, displayName: String = "Loaded") {
                   try {
-                      player.setMediaItem(MediaItem.fromUri(uri))
-                      player.prepare()
-                      isLoaded = true
-                      bpm = 120f + (0..12).random()
-                      loadedName = displayName
+                      player.setMediaItem(MediaItem.fromUri(uri)); player.prepare()
+                      isLoaded = true; bpm = 120f + (0..16).random(); loadedName = displayName
                   } catch (_: Throwable) { isLoaded = false }
               }
-
               fun play() { try { player.play(); isPlaying = true } catch (_: Throwable) {} }
               fun pause() { try { player.pause(); isPlaying = false } catch (_: Throwable) {} }
               fun toggle() { if (isPlaying) pause() else play() }
-
               fun setVolume(v: Float) { try { player.volume = v.coerceIn(0f, 1f) } catch (_: Throwable) {} }
+              fun currentSpeed(): Float = try { player.playbackParameters.speed } catch (_: Throwable) { 1f }
 
-              fun scratch(rate: Float) {
+              fun beginScratch() {
                   try {
-                      val r = rate.coerceIn(0.25f, 2.5f)
-                      scratchRate = r
-                      scratchVelocity = r - 1f
+                      wasPlayingBeforeScratch = player.isPlaying
                       scratching = true
-                      player.setPlaybackSpeed(r)
+                      scratchStartMs = player.currentPosition; scratchAccumMs = 0L
+                      scratchRate = 0f; scratchVelocity = 0f
+                      player.pause()
                   } catch (_: Throwable) {}
               }
-
-              fun endScratch() {
-                  effectJob?.cancel()
-                  effectJob = scope.launch {
-                      try {
-                          var speed = player.playbackParameters.speed
-                          if (speed <= 0f) speed = 1f
-                          val steps = 10
-                          val step = (1f - speed) / steps
-                          for (i in 0 until steps) {
-                              speed += step
-                              player.setPlaybackSpeed(speed.coerceIn(0.25f, 2.5f))
-                              scratchRate = speed
-                              scratchVelocity = speed - 1f
-                              delay(18)
-                          }
-                          player.setPlaybackSpeed(1f)
-                          scratchRate = 1f
-                          scratchVelocity = 0f
-                      } catch (_: Throwable) {}
-                      scratching = false
-                  }
+              fun scratchMove(deltaPixels: Float) {
+                  try {
+                      val msPerPixel = 5f
+                      scratchAccumMs += (-deltaPixels * msPerPixel).toLong()
+                      val dur = player.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
+                      val target = (scratchStartMs + scratchAccumMs).coerceIn(0L, dur)
+                      player.seekTo(target)
+                      val instantRate = (-deltaPixels / 15f).coerceIn(-3f, 3f)
+                      scratchRate = instantRate; scratchVelocity = instantRate
+                  } catch (_: Throwable) {}
               }
-
+              fun endScratch() {
+                  try {
+                      val inertiaMs = (scratchAccumMs * 0.20f).toLong()
+                      val dur = player.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
+                      val finalPos = (scratchStartMs + scratchAccumMs + inertiaMs).coerceIn(0L, dur)
+                      player.seekTo(finalPos)
+                      if (wasPlayingBeforeScratch) player.play()
+                      scratching = false; scratchRate = 1f; scratchVelocity = 0f
+                  } catch (_: Throwable) { scratching = false }
+              }
               fun spinback() {
                   effectJob?.cancel()
                   effectJob = scope.launch {
                       try {
                           val wasPlaying = player.isPlaying
                           scratching = true
-                          scratchRate = -0.5f; scratchVelocity = -1.5f
-                          player.setPlaybackSpeed(0.25f); delay(30)
-                          player.setPlaybackSpeed(-0.5f); delay(70)
-                          player.setPlaybackSpeed(0.25f); delay(70)
-                          player.setPlaybackSpeed(1f)
-                          scratchRate = 1f; scratchVelocity = 0f
-                          scratching = false
+                          val startMs = player.currentPosition
+                          val rewindMs = 900L; val steps = 18; val stepBack = rewindMs / steps
+                          for (i in 0 until steps) {
+                              player.seekTo((startMs - i * stepBack).coerceAtLeast(0L))
+                              scratchRate = -3f; scratchVelocity = -3f; delay(18)
+                          }
+                          scratchRate = 1f; scratchVelocity = 0f; scratching = false
                           if (wasPlaying) player.play()
                       } catch (_: Throwable) { scratching = false }
                   }
               }
-
               fun brake() {
                   effectJob?.cancel()
                   effectJob = scope.launch {
@@ -568,42 +483,27 @@ jobs:
                           if (speed <= 0.05f) speed = 1f
                           val step = (speed - 0.05f) / 14f
                           for (i in 0 until 14) {
-                              speed -= step
-                              player.setPlaybackSpeed(speed.coerceAtLeast(0.05f))
-                              scratchRate = speed
-                              scratchVelocity = speed - 1f
-                              delay(35)
+                              speed -= step; player.setPlaybackSpeed(speed.coerceAtLeast(0.05f))
+                              scratchRate = speed; scratchVelocity = speed - 1f; delay(35)
                           }
-                          player.pause()
-                          player.setPlaybackSpeed(1f)
+                          player.pause(); player.setPlaybackSpeed(1f)
                           scratchRate = 1f; scratchVelocity = 0f
                       } catch (_: Throwable) {}
                       scratching = false
                   }
               }
-
               fun setCue(slot: Int) { if (slot in 0..7) cuePoints[slot] = positionMs() }
               fun jumpToCue(slot: Int) {
                   if (slot !in 0..7) return
-                  val t = cuePoints[slot]
-                  if (t >= 0) try { player.seekTo(t) } catch (_: Throwable) {}
+                  val t = cuePoints[slot]; if (t >= 0) try { player.seekTo(t) } catch (_: Throwable) {}
               }
-
-              fun toggleLoop(beats: Int = loopBeats) {
-                  loopBeats = beats
-                  if (loopActive) stopLoop() else startLoop(beats)
-              }
-
+              fun toggleLoop(beats: Int = loopBeats) { loopBeats = beats; if (loopActive) stopLoop() else startLoop(beats) }
               private fun startLoop(beats: Int) {
                   try {
                       val beatMs = if (bpm > 0) (60000f / bpm).toLong() else 500L
-                      val loopLen = beatMs * beats
-                      val start = positionMs()
-                      loopStartMs = start
-                      loopEndMs = start + loopLen
-                      loopActive = true
-                      loopJob?.cancel()
-                      loopJob = scope.launch {
+                      val loopLen = beatMs * beats; val start = positionMs()
+                      loopStartMs = start; loopEndMs = start + loopLen; loopActive = true
+                      loopJob?.cancel(); loopJob = scope.launch {
                           while (loopActive) {
                               try { if (player.currentPosition >= loopEndMs) player.seekTo(loopStartMs) } catch (_: Throwable) {}
                               delay(30)
@@ -611,12 +511,9 @@ jobs:
                       }
                   } catch (_: Throwable) {}
               }
-
               fun stopLoop() { loopActive = false; loopJob?.cancel(); loopJob = null }
-
               fun positionMs(): Long = try { player.currentPosition } catch (_: Throwable) { 0L }
               fun durationMs(): Long = try { val d = player.duration; if (d > 0) d else 0L } catch (_: Throwable) { 0L }
-
               fun release() {
                   effectJob?.cancel(); loopJob?.cancel()
                   try { player.release() } catch (_: Throwable) {}
@@ -629,38 +526,52 @@ jobs:
         run: |
           cat > app/src/main/java/com/djpro/mixer/audio/AudioEngine.kt << 'EOF'
           package com.djpro.mixer.audio
-
           import android.content.Context
           import kotlin.math.cos
           import kotlin.math.sin
-
+          enum class CrossfaderMode { CUT, FADE }
           class AudioEngine(context: Context) {
-
               val decks: List<DeckPlayer> = (0 until 6).map { DeckPlayer(it, context) }
-
               var crossfader: Float = 0.5f; private set
+              var crossfaderMode: CrossfaderMode = CrossfaderMode.FADE; private set
               var masterVolume: Float = 1.0f; private set
-
-              var echoEnabled = false
-              var filterEnabled = false
-              var vocalRemovalEnabled = false
-
+              var activeDeckA: Int = 0; private set
+              var activeDeckB: Int = 1; private set
+              var echoEnabled = false; var filterEnabled = false; var vocalRemovalEnabled = false
+              var stemDrumsMuted = false; var stemBassMuted = false; var stemOtherMuted = false
+              val history = mutableListOf<String>()
               init { setCrossfader(0.5f); setMasterVolume(1.0f) }
-
-              fun setCrossfader(v: Float) {
-                  crossfader = v.coerceIn(0f, 1f)
-                  val a = cos(crossfader * Math.PI / 2).toFloat()
-                  val b = sin(crossfader * Math.PI / 2).toFloat()
-                  decks[0].setVolume(a * masterVolume)
-                  decks[1].setVolume(b * masterVolume)
+              fun swapToA(deckId: Int) { if (deckId in decks.indices && deckId != activeDeckB) { activeDeckA = deckId; applyCrossfader() } }
+              fun swapToB(deckId: Int) { if (deckId in decks.indices && deckId != activeDeckB && deckId != activeDeckA) { activeDeckB = deckId; applyCrossfader() } }
+              fun deckA(): DeckPlayer = decks[activeDeckA]
+              fun deckB(): DeckPlayer = decks[activeDeckB]
+              fun setCrossfader(v: Float) { crossfader = v.coerceIn(0f, 1f); applyCrossfader() }
+              fun setCrossfaderMode(m: CrossfaderMode) { crossfaderMode = m; applyCrossfader() }
+              private fun applyCrossfader() {
+                  val (a, b) = when (crossfaderMode) {
+                      CrossfaderMode.FADE -> cos(crossfader * Math.PI / 2).toFloat() to sin(crossfader * Math.PI / 2).toFloat()
+                      CrossfaderMode.CUT -> {
+                          val zone = 0.05f
+                          when {
+                              crossfader < 0.5f - zone -> 1f to 0f
+                              crossfader > 0.5f + zone -> 0f to 1f
+                              else -> { val t = (crossfader - (0.5f - zone)) / (2 * zone); 1f - t to t }
+                          }
+                      }
+                  }
+                  decks[activeDeckA].setVolume(a * masterVolume)
+                  decks[activeDeckB].setVolume(b * masterVolume)
               }
-
-              fun setMasterVolume(v: Float) { masterVolume = v.coerceIn(0f, 1f); setCrossfader(crossfader) }
-
+              fun setMasterVolume(v: Float) { masterVolume = v.coerceIn(0f, 1f); applyCrossfader() }
               fun setEcho(on: Boolean) { echoEnabled = on; decks.forEach { it.echo.enabled = on } }
               fun setFilter(on: Boolean) { filterEnabled = on; decks.forEach { it.filter.enabled = on } }
               fun setVocalRemoval(on: Boolean) { vocalRemovalEnabled = on; decks.forEach { it.vocal.enabled = on } }
-
+              fun setStemMutes(drums: Boolean, bass: Boolean, other: Boolean) {
+                  stemDrumsMuted = drums; stemBassMuted = bass; stemOtherMuted = other
+                  val lowDb = if (bass) -26f else if (drums) -12f else 0f
+                  val highDb = if (other) -26f else 0f
+                  decks.forEach { it.eq.lowGainDb = lowDb; it.eq.highGainDb = highDb }
+              }
               fun setEq(index: Int, low: Float, mid: Float, high: Float) {
                   if (index !in decks.indices) return
                   val d = decks[index]
@@ -668,39 +579,35 @@ jobs:
                   d.eq.midGainDb = mid.coerceIn(-26f, 6f)
                   d.eq.highGainDb = high.coerceIn(-26f, 6f)
               }
-
               fun syncBpm(sourceIndex: Int, targetIndex: Int) {
                   if (sourceIndex !in decks.indices || targetIndex !in decks.indices) return
-                  val srcBpm = decks[sourceIndex].bpm
-                  val tgtBpm = decks[targetIndex].bpm
-                  if (srcBpm <= 0f || tgtBpm <= 0f) return
-                  val ratio = srcBpm / tgtBpm
-                  try { decks[targetIndex].player.setPlaybackSpeed(ratio.coerceIn(0.5f, 2f)) } catch (_: Throwable) {}
+                  val src = decks[sourceIndex].bpm; val tgt = decks[targetIndex].bpm
+                  if (src <= 0f || tgt <= 0f) return
+                  try { decks[targetIndex].player.setPlaybackSpeed((src / tgt).coerceIn(0.5f, 2f)) } catch (_: Throwable) {}
               }
-
               fun loadDeck(index: Int, uri: String, name: String = "Loaded") {
-                  if (index in decks.indices) decks[index].load(uri, name)
+                  if (index in decks.indices) {
+                      decks[index].load(uri, name)
+                      history.add(0, name); if (history.size > 20) history.removeAt(history.size - 1)
+                  }
               }
               fun togglePlay(index: Int) { if (index in decks.indices) decks[index].toggle() }
-              fun scratch(index: Int, rate: Float) { if (index in decks.indices) decks[index].scratch(rate) }
+              fun beginScratch(index: Int) { if (index in decks.indices) decks[index].beginScratch() }
+              fun scratchMove(index: Int, dy: Float) { if (index in decks.indices) decks[index].scratchMove(dy) }
               fun endScratch(index: Int) { if (index in decks.indices) decks[index].endScratch() }
               fun spinback(index: Int) { if (index in decks.indices) decks[index].spinback() }
               fun brake(index: Int) { if (index in decks.indices) decks[index].brake() }
               fun setCue(index: Int, slot: Int) { if (index in decks.indices) decks[index].setCue(slot) }
               fun jumpCue(index: Int, slot: Int) { if (index in decks.indices) decks[index].jumpToCue(slot) }
               fun toggleLoop(index: Int, beats: Int) { if (index in decks.indices) decks[index].toggleLoop(beats) }
-
               fun release() { decks.forEach { it.release() } }
           }
           EOF
 
-      # ==================== VIDEO ====================
-
-      - name: RecordingService.kt
+      - name: Video files
         run: |
           cat > app/src/main/java/com/djpro/mixer/video/RecordingService.kt << 'EOF'
           package com.djpro.mixer.video
-
           import android.app.Notification
           import android.app.NotificationChannel
           import android.app.NotificationManager
@@ -712,24 +619,18 @@ jobs:
           import android.os.IBinder
           import androidx.core.app.NotificationCompat
           import androidx.core.app.ServiceCompat
-
           class RecordingService : Service() {
               override fun onBind(intent: Intent?): IBinder? = null
               override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-                  val channelId = "dj_recording"
+                  val cid = "dj_recording"
                   val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                      nm.createNotificationChannel(
-                          NotificationChannel(channelId, "DJ Recording", NotificationManager.IMPORTANCE_LOW)
-                      )
-                  }
-                  val n: Notification = NotificationCompat.Builder(this, channelId)
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                      nm.createNotificationChannel(NotificationChannel(cid, "DJ Recording", NotificationManager.IMPORTANCE_LOW))
+                  val n: Notification = NotificationCompat.Builder(this, cid)
                       .setContentTitle("DJ Pro Mixer").setContentText("Recording")
                       .setSmallIcon(android.R.drawable.presence_video_online).setOngoing(true).build()
-                  val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                      ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION or
-                      ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-                  } else 0
+                  val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
+                      ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0
                   try { ServiceCompat.startForeground(this, 4242, n, type) }
                   catch (_: Throwable) { try { startForeground(4242, n) } catch (_: Throwable) {} }
                   return START_NOT_STICKY
@@ -737,11 +638,8 @@ jobs:
           }
           EOF
 
-      - name: MixRecorder.kt
-        run: |
           cat > app/src/main/java/com/djpro/mixer/video/MixRecorder.kt << 'EOF'
           package com.djpro.mixer.video
-
           import android.content.Context
           import android.content.Intent
           import android.hardware.display.DisplayManager
@@ -754,18 +652,17 @@ jobs:
           import android.util.DisplayMetrics
           import android.view.WindowManager
           import java.io.File
-
           class MixRecorder(private val context: Context) {
               private var projection: MediaProjection? = null
               private var virtualDisplay: VirtualDisplay? = null
               private var recorder: MediaRecorder? = null
               private var outputFile: File? = null
-
+              var isRecording: Boolean = false; private set
               fun buildIntent(): Intent? = try {
                   context.getSystemService(MediaProjectionManager::class.java).createScreenCaptureIntent()
               } catch (_: Throwable) { null }
-
               fun start(resultCode: Int, data: Intent): Boolean {
+                  if (isRecording) return false
                   return try {
                       val mgr = context.getSystemService(MediaProjectionManager::class.java)
                       projection = mgr.getMediaProjection(resultCode, data)
@@ -791,14 +688,13 @@ jobs:
                           "DJProRec", w, h, dpi, DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                           rec.surface, null, null
                       )
-                      rec.start(); true
+                      rec.start(); isRecording = true; true
                   } catch (_: Throwable) { false }
               }
-
               fun stop(): File? {
                   try { recorder?.stop() } catch (_: Throwable) {}
                   try { recorder?.release() } catch (_: Throwable) {}
-                  recorder = null
+                  recorder = null; isRecording = false
                   try { virtualDisplay?.release() } catch (_: Throwable) {}
                   virtualDisplay = null
                   try { projection?.stop() } catch (_: Throwable) {}
@@ -808,22 +704,18 @@ jobs:
           }
           EOF
 
-      # ==================== THEME ====================
-
       - name: NeonTheme.kt
         run: |
           cat > app/src/main/java/com/djpro/mixer/NeonTheme.kt << 'EOF'
           package com.djpro.mixer
-
           import androidx.compose.ui.graphics.Color
-
           object Neon {
               val BG = Color(0xFF05050A)
               val CLUB_BG = Color(0xFF000000)
               val PANEL = Color(0xFF0E0E16)
+              val PANEL_DARK = Color(0xFF08080E)
               val BTN_BG = Color(0xFF1A1A24)
               val DEEP = Color(0xFF0A0A14)
-
               val CYAN = Color(0xFF00E5FF)
               val MAGENTA = Color(0xFFFF2BD6)
               val LIME = Color(0xFF9CFF2B)
@@ -831,73 +723,33 @@ jobs:
               val PURPLE = Color(0xFFB14AFF)
               val RED = Color(0xFFFF3B5C)
               val YELLOW = Color(0xFFFFD54A)
-
               val TEXT = Color(0xFFE5E5F0)
               val TEXT_DIM = Color(0x80E5E5F0)
               val LIVE = Color(0xFF4BFF7A)
-
               val DECK_COLORS = listOf(CYAN, MAGENTA, LIME, ORANGE, PURPLE, RED)
           }
           EOF
 
-      # ==================== UI ====================
-
-      - name: WaveformView.kt
+      - name: UI components
         run: |
-          cat > app/src/main/java/com/djpro/mixer/ui/WaveformView.kt << 'EOF'
+          cat > app/src/main/java/com/djpro/mixer/ui/MetalJogWheel.kt << 'EOF'
           package com.djpro.mixer.ui
-
-          import androidx.compose.foundation.Canvas
-          import androidx.compose.foundation.layout.fillMaxWidth
-          import androidx.compose.foundation.layout.height
-          import androidx.compose.runtime.Composable
-          import androidx.compose.runtime.remember
-          import androidx.compose.ui.Modifier
-          import androidx.compose.ui.geometry.Offset
-          import androidx.compose.ui.graphics.Color
-          import androidx.compose.ui.graphics.StrokeCap
-          import androidx.compose.ui.unit.dp
-          import kotlin.math.abs
-          import kotlin.random.Random
-
-          @Composable
-          fun WaveformView(accent: Color, modifier: Modifier = Modifier, barCount: Int = 90, seed: Int = 42) {
-              val bars = remember(seed, barCount) {
-                  val rnd = Random(seed)
-                  FloatArray(barCount) { i ->
-                      val pos = i.toFloat() / barCount
-                      val env = 1f - abs(pos - 0.5f) * 1.3f
-                      (0.25f + 0.75f * env * rnd.nextFloat()).coerceIn(0.1f, 1f)
-                  }
-              }
-              Canvas(modifier = modifier.fillMaxWidth().height(28.dp)) {
-                  val w = size.width; val h = size.height
-                  val step = w / barCount
-                  val barW = (step * 0.55f).coerceAtLeast(1.2f)
-                  val mid = h / 2f
-                  for (i in 0 until barCount) {
-                      val amp = bars[i] * (h * 0.46f)
-                      val x = i * step + step / 2f
-                      drawLine(accent.copy(alpha = 0.85f), Offset(x, mid - amp), Offset(x, mid + amp), barW, StrokeCap.Round)
-                      drawLine(accent.copy(alpha = 0.25f), Offset(x, mid - amp * 1.35f), Offset(x, mid + amp * 1.35f), barW * 0.4f, StrokeCap.Round)
-                  }
-                  drawLine(accent.copy(alpha = 0.3f), Offset(0f, mid), Offset(w, mid), 0.8f)
-              }
-          }
-          EOF
-
-      - name: JogWheel.kt
-        run: |
-          cat > app/src/main/java/com/djpro/mixer/ui/JogWheel.kt << 'EOF'
-          package com.djpro.mixer.ui
-
-          import androidx.compose.animation.core.*
+          import androidx.compose.animation.core.LinearEasing
+          import androidx.compose.animation.core.RepeatMode
+          import androidx.compose.animation.core.animateFloat
+          import androidx.compose.animation.core.infiniteRepeatable
+          import androidx.compose.animation.core.rememberInfiniteTransition
+          import androidx.compose.animation.core.tween
           import androidx.compose.foundation.Canvas
           import androidx.compose.foundation.gestures.detectDragGestures
           import androidx.compose.foundation.layout.Box
           import androidx.compose.foundation.layout.fillMaxSize
           import androidx.compose.foundation.layout.size
-          import androidx.compose.runtime.*
+          import androidx.compose.runtime.Composable
+          import androidx.compose.runtime.getValue
+          import androidx.compose.runtime.mutableFloatStateOf
+          import androidx.compose.runtime.remember
+          import androidx.compose.runtime.setValue
           import androidx.compose.ui.Alignment
           import androidx.compose.ui.Modifier
           import androidx.compose.ui.geometry.Offset
@@ -910,160 +762,200 @@ jobs:
           import androidx.compose.ui.unit.Dp
           import kotlin.math.cos
           import kotlin.math.sin
-
           @Composable
-          fun JogWheel(
+          fun MetalJogWheel(
               accent: Color, size: Dp, isPlaying: Boolean,
-              onScratch: (Float) -> Unit, onScratchEnd: () -> Unit,
+              onScratchStart: () -> Unit, onScratchMove: (Float) -> Unit, onScratchEnd: () -> Unit,
               modifier: Modifier = Modifier
           ) {
               var userAngle by remember { mutableFloatStateOf(0f) }
               val infinite = rememberInfiniteTransition(label = "jog")
-              val spin by infinite.animateFloat(
-                  0f, 360f,
-                  infiniteRepeatable(tween(2400, easing = LinearEasing), RepeatMode.Restart),
-                  label = "spin"
-              )
+              val spin by infinite.animateFloat(0f, 360f,
+                  infiniteRepeatable(tween(2400, easing = LinearEasing), RepeatMode.Restart), label = "spin")
               val displayedAngle = if (isPlaying) userAngle + spin else userAngle
-
-              Box(
-                  modifier = modifier.size(size).pointerInput(Unit) {
-                      detectDragGestures(
-                          onDrag = { change: PointerInputChange, drag: Offset ->
-                              change.consume()
-                              userAngle += drag.y * 0.9f
-                              onScratch(1f - (drag.y / 120f))
-                          },
-                          onDragEnd = { onScratchEnd() },
-                          onDragCancel = { onScratchEnd() }
-                      )
-                  },
-                  contentAlignment = Alignment.Center
-              ) {
+              Box(modifier = modifier.size(size).pointerInput(Unit) {
+                  detectDragGestures(
+                      onDragStart = { onScratchStart() },
+                      onDrag = { change: PointerInputChange, drag: Offset ->
+                          change.consume()
+                          userAngle += drag.y * 0.9f
+                          onScratchMove(drag.y)
+                      },
+                      onDragEnd = { onScratchEnd() },
+                      onDragCancel = { onScratchEnd() }
+                  )
+              }, contentAlignment = Alignment.Center) {
                   Canvas(modifier = Modifier.fillMaxSize()) {
-                      val cx = this.size.width / 2f
-                      val cy = this.size.height / 2f
-                      val r = this.size.minDimension / 2f
-                      val c = Offset(cx, cy)
-
-                      drawCircle(Brush.radialGradient(listOf(accent.copy(alpha = 0.35f), Color.Transparent), c, r), r, c)
-                      drawCircle(Brush.linearGradient(listOf(Color(0xFF3A3A48), Color(0xFF14141C), Color(0xFF3A3A48)), Offset(0f, 0f), Offset(this.size.width, this.size.height)), r * 0.94f, c)
-                      drawCircle(accent, r * 0.94f, c, style = Stroke(width = 3f))
-                      drawCircle(accent.copy(alpha = 0.35f), r * 0.94f, c, style = Stroke(width = 8f))
-                      drawCircle(Brush.radialGradient(listOf(Color(0xFF232330), Color(0xFF0A0A12)), c, r * 0.78f), r * 0.78f, c)
-                      for (g in 1..4) drawCircle(accent.copy(alpha = 0.10f), r * (0.30f + g * 0.11f), c, style = Stroke(width = 1f))
-                      drawCircle(Color(0xFF1A1A24), r * 0.22f, c)
-                      drawCircle(accent, r * 0.22f, c, style = Stroke(width = 2f))
-                      drawCircle(accent, r * 0.05f, c)
-
+                      val cx = this.size.width / 2f; val cy = this.size.height / 2f
+                      val r = this.size.minDimension / 2f; val c = Offset(cx, cy)
+                      drawCircle(Brush.radialGradient(listOf(accent.copy(alpha = 0.30f), Color.Transparent), c, r), r, c)
+                      drawCircle(Brush.linearGradient(listOf(Color(0xFF2A2A36), Color(0xFF0A0A12), Color(0xFF2A2A36)),
+                          Offset(0f, 0f), Offset(this.size.width, this.size.height)), r * 0.98f, c)
+                      drawCircle(accent, r * 0.98f, c, style = Stroke(width = 3f))
+                      drawCircle(accent.copy(alpha = 0.30f), r * 0.98f, c, style = Stroke(width = 9f))
+                      drawCircle(Brush.radialGradient(
+                          listOf(Color(0xFFE8E8EC), Color(0xFFB8B8C2), Color(0xFF8A8A96), Color(0xFF5A5A66)),
+                          Offset(cx - r * 0.20f, cy - r * 0.25f), r * 1.10f), r * 0.78f, c)
+                      for (g in 1..6) drawCircle(Color(0x30FFFFFF), r * (0.30f + g * 0.075f), c, style = Stroke(width = 0.8f))
+                      drawCircle(Brush.radialGradient(listOf(Color.Transparent, Color(0x50000000)), c, r * 0.78f), r * 0.78f, c)
+                      val crossR = r * 0.15f
+                      drawCircle(Color(0xFF2A2A38), crossR, c)
+                      drawCircle(Color(0xFF5A5A66), crossR, c, style = Stroke(width = 1f))
+                      drawLine(Color(0xFF9A9AA6), Offset(cx - crossR * 0.6f, cy), Offset(cx + crossR * 0.6f, cy), 1.5f)
+                      drawLine(Color(0xFF9A9AA6), Offset(cx, cy - crossR * 0.6f), Offset(cx, cy + crossR * 0.6f), 1.5f)
                       val rad = Math.toRadians(displayedAngle.toDouble())
-                      drawLine(accent, c, Offset(cx + (r * 0.72f) * cos(rad).toFloat(), cy + (r * 0.72f) * sin(rad).toFloat()), 3f, StrokeCap.Round)
-
-                      for (t in 0 until 60) {
-                          val a = Math.toRadians(t * 6.0)
-                          val rO = r * 0.90f
-                          val rI = if (t % 5 == 0) r * 0.80f else r * 0.85f
-                          drawLine(accent.copy(alpha = 0.5f),
-                              Offset(cx + rI * cos(a).toFloat(), cy + rI * sin(a).toFloat()),
-                              Offset(cx + rO * cos(a).toFloat(), cy + rO * sin(a).toFloat()),
-                              if (t % 5 == 0) 2f else 1f)
-                      }
+                      val dx = (r * 0.88f) * cos(rad).toFloat()
+                      val dy = (r * 0.88f) * sin(rad).toFloat()
+                      drawCircle(accent, 4f, Offset(cx + dx, cy + dy))
+                      drawLine(accent, c, Offset(cx + dx, cy + dy), 2f, StrokeCap.Round)
                   }
               }
           }
           EOF
 
-      - name: VerticalFader.kt
-        run: |
-          cat > app/src/main/java/com/djpro/mixer/ui/VerticalFader.kt << 'EOF'
+          cat > app/src/main/java/com/djpro/mixer/ui/BeatgridWaveform.kt << 'EOF'
           package com.djpro.mixer.ui
+          import androidx.compose.foundation.Canvas
+          import androidx.compose.foundation.layout.fillMaxWidth
+          import androidx.compose.foundation.layout.height
+          import androidx.compose.runtime.Composable
+          import androidx.compose.runtime.remember
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.geometry.Offset
+          import androidx.compose.ui.graphics.Color
+          import androidx.compose.ui.graphics.StrokeCap
+          import androidx.compose.ui.unit.dp
+          import kotlin.math.abs
+          import kotlin.random.Random
+          @Composable
+          fun BeatgridWaveform(accent: Color, modifier: Modifier = Modifier, barCount: Int = 140, seed: Int = 42) {
+              val bars = remember(seed, barCount) {
+                  val rnd = Random(seed)
+                  FloatArray(barCount) { i ->
+                      val pos = i.toFloat() / barCount
+                      val env = 1f - abs(pos - 0.5f) * 1.6f
+                      val beat = if (i % 8 == 0) 1.0f else if (i % 4 == 0) 0.7f else 0.4f
+                      (0.15f + 0.85f * (env * 0.5f + 0.5f) * beat * (0.5f + 0.5f * rnd.nextFloat())).coerceIn(0.05f, 1f)
+                  }
+              }
+              Canvas(modifier = modifier.fillMaxWidth().height(52.dp)) {
+                  val w = size.width; val h = size.height
+                  val step = w / barCount
+                  val barW = (step * 0.62f).coerceAtLeast(1.0f)
+                  val mid = h / 2f
+                  for (g in 0..4) { val y = h * g / 4f; drawLine(accent.copy(alpha = 0.06f), Offset(0f, y), Offset(w, y), 0.8f) }
+                  var i = 0
+                  while (i < barCount) { val x = i * step; drawLine(accent.copy(alpha = 0.35f), Offset(x, 0f), Offset(x, h), 1f); i += 8 }
+                  for (i in 0 until barCount) {
+                      val amp = bars[i] * (h * 0.46f); val x = i * step + step / 2f
+                      drawLine(accent, Offset(x, mid - amp), Offset(x, mid + amp), barW, StrokeCap.Round)
+                  }
+              }
+          }
+          EOF
 
+          cat > app/src/main/java/com/djpro/mixer/ui/VolumeFader.kt << 'EOF'
+          package com.djpro.mixer.ui
           import androidx.compose.foundation.Canvas
           import androidx.compose.foundation.gestures.detectDragGestures
           import androidx.compose.foundation.layout.Box
           import androidx.compose.foundation.layout.fillMaxHeight
           import androidx.compose.foundation.layout.width
-          import androidx.compose.runtime.*
+          import androidx.compose.runtime.Composable
+          import androidx.compose.runtime.getValue
+          import androidx.compose.runtime.mutableFloatStateOf
+          import androidx.compose.runtime.remember
+          import androidx.compose.runtime.setValue
           import androidx.compose.ui.Modifier
+          import androidx.compose.ui.geometry.CornerRadius
           import androidx.compose.ui.geometry.Offset
+          import androidx.compose.ui.geometry.Size
           import androidx.compose.ui.graphics.Color
           import androidx.compose.ui.graphics.StrokeCap
           import androidx.compose.ui.graphics.drawscope.Stroke
           import androidx.compose.ui.input.pointer.PointerInputChange
           import androidx.compose.ui.input.pointer.pointerInput
           import androidx.compose.ui.unit.dp
-
           @Composable
-          fun VerticalFader(accent: Color, defaultValue: Float = 0.5f, onValueChange: (Float) -> Unit = {}, modifier: Modifier = Modifier) {
-              var value by remember { mutableFloatStateOf(defaultValue) }
-              Box(modifier = modifier.width(18.dp).fillMaxHeight().pointerInput(Unit) {
+          fun VolumeFader(accent: Color, initialValue: Float = 0.75f, onValueChange: (Float) -> Unit = {}, modifier: Modifier = Modifier) {
+              var value by remember { mutableFloatStateOf(initialValue) }
+              Box(modifier = modifier.width(28.dp).fillMaxHeight().pointerInput(Unit) {
                   detectDragGestures { change: PointerInputChange, drag: Offset ->
                       change.consume()
                       value = (value + (-drag.y / size.height)).coerceIn(0f, 1f)
                       onValueChange(value)
                   }
               }) {
-                  Canvas(modifier = Modifier.fillMaxHeight().width(18.dp)) {
+                  Canvas(modifier = Modifier.fillMaxHeight().width(28.dp)) {
                       val cx = size.width / 2f; val h = size.height
-                      drawLine(Color(0xFF2A2A38), Offset(cx, 0f), Offset(cx, h), 4f, StrokeCap.Round)
+                      drawLine(Color(0xFF2A2A38), Offset(cx, 10f), Offset(cx, h - 10f), 3f, StrokeCap.Round)
                       val y = h - value * (h - 20f) - 10f
-                      drawLine(accent.copy(alpha = 0.6f), Offset(cx, h), Offset(cx, y), 4f, StrokeCap.Round)
-                      drawCircle(Color(0xFF16161E), 8f, Offset(cx, y))
-                      drawCircle(accent, 8f, Offset(cx, y), style = Stroke(width = 2f))
+                      drawLine(accent.copy(alpha = 0.55f), Offset(cx, h - 10f), Offset(cx, y), 3f, StrokeCap.Round)
+                      drawRoundRect(accent, Offset(cx - 12f, y - 6f), Size(24f, 12f), CornerRadius(3f))
+                      drawRoundRect(Color(0x40FFFFFF), Offset(cx - 12f, y - 6f), Size(24f, 4f), CornerRadius(3f))
+                      drawRoundRect(Color(0x60000000), Offset(cx - 12f, y - 6f), Size(24f, 12f), CornerRadius(3f), style = Stroke(width = 1f))
                   }
               }
           }
           EOF
 
-      - name: MasterVuMeter.kt
-        run: |
-          cat > app/src/main/java/com/djpro/mixer/ui/MasterVuMeter.kt << 'EOF'
+          cat > app/src/main/java/com/djpro/mixer/ui/MasterVu.kt << 'EOF'
           package com.djpro.mixer.ui
-
-          import androidx.compose.animation.core.*
+          import androidx.compose.animation.core.LinearEasing
+          import androidx.compose.animation.core.RepeatMode
+          import androidx.compose.animation.core.animateFloat
+          import androidx.compose.animation.core.infiniteRepeatable
+          import androidx.compose.animation.core.rememberInfiniteTransition
+          import androidx.compose.animation.core.tween
           import androidx.compose.foundation.Canvas
-          import androidx.compose.foundation.layout.fillMaxWidth
-          import androidx.compose.foundation.layout.height
-          import androidx.compose.runtime.*
+          import androidx.compose.foundation.layout.fillMaxHeight
+          import androidx.compose.foundation.layout.width
+          import androidx.compose.runtime.Composable
+          import androidx.compose.runtime.getValue
           import androidx.compose.ui.Modifier
           import androidx.compose.ui.geometry.Offset
+          import androidx.compose.ui.geometry.Size
+          import androidx.compose.ui.graphics.Color
           import androidx.compose.ui.unit.dp
-          import com.djpro.mixer.Neon
-          import kotlin.math.abs
           import kotlin.math.sin
-
           @Composable
-          fun MasterVuMeter(playing: Boolean, modifier: Modifier = Modifier) {
+          fun MasterVu(playing: Boolean, modifier: Modifier = Modifier) {
               val infinite = rememberInfiniteTransition(label = "vu")
               val phase by infinite.animateFloat(0f, (2 * Math.PI).toFloat() * 20f,
-                  infiniteRepeatable(tween(3000, easing = LinearEasing), RepeatMode.Restart), label = "phase")
-              Canvas(modifier = modifier.fillMaxWidth().height(14.dp)) {
-                  val w = size.width; val h = size.height; val mid = h / 2f
-                  val bars = 120; val step = w / bars
-                  for (i in 0 until bars) {
-                      val t = i.toFloat() / bars
-                      val env = (1f - abs(t - 0.5f) * 1.6f).coerceAtLeast(0.05f)
-                      val anim = if (playing) (0.5f + 0.5f * sin(phase + i * 0.35f)).coerceIn(0.15f, 1f) else 0.15f
-                      val amp = env * anim * (h * 0.5f - 1f)
-                      val x = i * step + step / 2f
-                      val color = if (t < 0.5f) Neon.CYAN else Neon.MAGENTA
-                      drawLine(color.copy(alpha = 0.85f), Offset(x, mid - amp), Offset(x, mid + amp), (step * 0.6f).coerceAtLeast(1f))
+                  infiniteRepeatable(tween(2500, easing = LinearEasing), RepeatMode.Restart), label = "phase")
+              Canvas(modifier = modifier.width(18.dp).fillMaxHeight()) {
+                  val w = size.width; val h = size.height
+                  val segments = 20
+                  val segH = (h - (segments - 1) * 2f) / segments
+                  for (i in 0 until segments) {
+                      val y = i * (segH + 2f)
+                      val t = 1f - i.toFloat() / segments
+                      val level = if (playing) (0.55f + 0.45f * sin(phase + i * 0.6f)).coerceIn(0.20f, 1f) else 0.10f
+                      val lit = t < level
+                      val color = when {
+                          t > 0.90f -> Color(0xFFFF3B5C)
+                          t > 0.75f -> Color(0xFFFFD54A)
+                          t > 0.55f -> Color(0xFF9CFF2B)
+                          else -> Color(0xFF00E5FF)
+                      }
+                      drawRect(color = color.copy(alpha = if (lit) 1f else 0.12f), topLeft = Offset(0f, y), size = Size(w, segH))
                   }
               }
           }
           EOF
 
-      - name: EqKnob.kt
-        run: |
-          cat > app/src/main/java/com/djpro/mixer/ui/EqKnob.kt << 'EOF'
+          cat > app/src/main/java/com/djpro/mixer/ui/KnobSmall.kt << 'EOF'
           package com.djpro.mixer.ui
-
           import androidx.compose.foundation.Canvas
           import androidx.compose.foundation.gestures.detectDragGestures
           import androidx.compose.foundation.layout.Box
           import androidx.compose.foundation.layout.size
           import androidx.compose.material3.Text
-          import androidx.compose.runtime.*
+          import androidx.compose.runtime.Composable
+          import androidx.compose.runtime.getValue
+          import androidx.compose.runtime.mutableFloatStateOf
+          import androidx.compose.runtime.remember
+          import androidx.compose.runtime.setValue
           import androidx.compose.ui.Alignment
           import androidx.compose.ui.Modifier
           import androidx.compose.ui.geometry.Offset
@@ -1079,38 +971,43 @@ jobs:
           import androidx.compose.ui.unit.sp
           import kotlin.math.cos
           import kotlin.math.sin
-
           @Composable
-          fun EqKnob(label: String, accent: Color, initialValue: Float = 0f, onValueChange: (Float) -> Unit = {}, modifier: Modifier = Modifier) {
+          fun KnobSmall(
+              label: String, accent: Color, initialValue: Float = 0f,
+              minValue: Float = -26f, maxValue: Float = 6f,
+              size: androidx.compose.ui.unit.Dp = 40.dp,
+              onValueChange: (Float) -> Unit = {}, modifier: Modifier = Modifier
+          ) {
               var value by remember { mutableFloatStateOf(initialValue) }
-              Box(modifier = modifier.size(44.dp).pointerInput(Unit) {
+              Box(modifier = modifier.size(size).pointerInput(Unit) {
                   detectDragGestures { change: PointerInputChange, drag: Offset ->
                       change.consume()
-                      value = (value + (-drag.y / 4f)).coerceIn(-26f, 6f)
+                      val range = maxValue - minValue
+                      value = (value + (-drag.y / 3f) * range / 30f).coerceIn(minValue, maxValue)
                       onValueChange(value)
                   }
               }, contentAlignment = Alignment.Center) {
-                  Canvas(modifier = Modifier.size(44.dp)) {
-                      val cx = size.width / 2f; val cy = size.height / 2f
-                      val r = size.minDimension / 2f - 2f
-                      drawCircle(Brush.radialGradient(listOf(Color(0xFF2A2A38), Color(0xFF0E0E16)), Offset(cx, cy), r), r, Offset(cx, cy))
-                      drawCircle(accent.copy(alpha = 0.5f), r, Offset(cx, cy), style = Stroke(width = 1.5f))
+                  Canvas(modifier = Modifier.size(size)) {
+                      val cx = this.size.width / 2f; val cy = this.size.height / 2f
+                      val r = this.size.minDimension / 2f - 2f
+                      drawCircle(Brush.radialGradient(listOf(Color(0xFF2E2E3C), Color(0xFF12121C)), Offset(cx, cy), r), r, Offset(cx, cy))
+                      drawCircle(accent.copy(alpha = 0.45f), r, Offset(cx, cy), style = Stroke(width = 1f))
                       val start = 135f; val sweep = 270f
-                      drawArc(accent.copy(alpha = 0.25f), start, sweep, false, Offset(cx - r, cy - r), Size(r * 2, r * 2), style = Stroke(2f, cap = StrokeCap.Round))
-                      val normalized = ((value + 26f) / 32f).coerceIn(0f, 1f)
-                      val angleRad = Math.toRadians((start + normalized * sweep).toDouble())
-                      drawLine(accent, Offset(cx, cy), Offset(cx + (r - 6f) * cos(angleRad).toFloat(), cy + (r - 6f) * sin(angleRad).toFloat()), 2.5f, StrokeCap.Round)
+                      drawArc(accent.copy(alpha = 0.22f), start, sweep, false, Offset(cx - r, cy - r), Size(r * 2, r * 2), style = Stroke(1.5f, cap = StrokeCap.Round))
+                      val range = maxValue - minValue
+                      val n = ((value - minValue) / range).coerceIn(0f, 1f)
+                      drawArc(accent, start, sweep * n, false, Offset(cx - r, cy - r), Size(r * 2, r * 2), style = Stroke(2.5f, cap = StrokeCap.Round))
+                      val aRad = Math.toRadians((start + sweep * n).toDouble())
+                      drawLine(Color.White, Offset(cx, cy), Offset(cx + (r - 5f) * cos(aRad).toFloat(), cy + (r - 5f) * sin(aRad).toFloat()), 2f, StrokeCap.Round)
+                      drawCircle(Color(0xFF1A1A24), 3f, Offset(cx, cy))
                   }
-                  Text(label, color = accent, fontSize = 7.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.BottomCenter))
+                  Text(label, color = accent.copy(alpha = 0.85f), fontSize = 7.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.BottomCenter))
               }
           }
           EOF
 
-      - name: ScratchOverlay.kt
-        run: |
           cat > app/src/main/java/com/djpro/mixer/ui/ScratchOverlay.kt << 'EOF'
           package com.djpro.mixer.ui
-
           import androidx.compose.animation.core.LinearEasing
           import androidx.compose.animation.core.RepeatMode
           import androidx.compose.animation.core.animateFloat
@@ -1139,27 +1036,15 @@ jobs:
           import com.djpro.mixer.Neon
           import kotlin.math.abs
           import kotlin.random.Random
-
           @Composable
-          fun ScratchOverlay(
-              accent: Color,
-              rate: Float,
-              velocity: Float,
-              modifier: Modifier = Modifier
-          ) {
+          fun ScratchOverlay(accent: Color, rate: Float, velocity: Float, modifier: Modifier = Modifier) {
               val infinite = rememberInfiniteTransition(label = "scratch")
-              val phase by infinite.animateFloat(
-                  0f, 1000f,
-                  infiniteRepeatable(tween(600, easing = LinearEasing), RepeatMode.Restart),
-                  label = "phase"
-              )
-
+              val phase by infinite.animateFloat(0f, 1000f,
+                  infiniteRepeatable(tween(600, easing = LinearEasing), RepeatMode.Restart), label = "phase")
               Box(modifier = modifier.fillMaxSize()) {
                   Canvas(modifier = Modifier.fillMaxSize()) {
-                      val w = size.width
-                      val h = size.height
+                      val w = size.width; val h = size.height
                       val intensity = (abs(velocity) * 1.2f).coerceIn(0f, 1.5f)
-
                       val rnd = Random((phase.toInt() * 7919))
                       val sliceCount = (10 + (intensity * 20)).toInt()
                       for (i in 0 until sliceCount) {
@@ -1167,56 +1052,27 @@ jobs:
                           val sliceH = 1f + rnd.nextFloat() * (3f + 8f * intensity)
                           val xOff = (rnd.nextFloat() - 0.5f) * 60f * intensity
                           val alpha = 0.15f + 0.4f * intensity * rnd.nextFloat()
-                          drawRect(
-                              color = if (rnd.nextBoolean()) accent.copy(alpha = alpha)
-                                      else Neon.MAGENTA.copy(alpha = alpha),
-                              topLeft = Offset(xOff, y),
-                              size = Size(w, sliceH)
-                          )
+                          drawRect(color = if (rnd.nextBoolean()) accent.copy(alpha = alpha) else Neon.MAGENTA.copy(alpha = alpha),
+                              topLeft = Offset(xOff, y), size = Size(w, sliceH))
                       }
-
                       val scanY = ((phase * 2f * (if (velocity >= 0) 1f else -1f)) % h + h) % h
-                      drawLine(
-                          color = accent.copy(alpha = 0.7f),
-                          start = Offset(0f, scanY),
-                          end = Offset(w, scanY),
-                          strokeWidth = 2f
-                      )
-
-                      val glowAlpha = 0.25f + 0.35f * intensity
-                      drawRect(color = accent.copy(alpha = glowAlpha * 0.15f))
+                      drawLine(accent.copy(alpha = 0.7f), Offset(0f, scanY), Offset(w, scanY), 2f)
+                      drawRect(color = accent.copy(alpha = (0.25f + 0.35f * intensity) * 0.15f))
                   }
-
                   CornerBrackets(accent)
-
-                  val displayRate = if (rate < 0f) "REV \u00D7${"%.2f".format(abs(rate))}"
-                                    else "\u00D7${"%.2f".format(rate)}"
-                  Box(
-                      modifier = Modifier
-                          .align(Alignment.TopCenter)
-                          .padding(top = 8.dp)
-                          .clip(RoundedCornerShape(50))
-                          .background(Color.Black.copy(alpha = 0.7f))
-                          .border(1.5.dp, accent, RoundedCornerShape(50))
-                          .padding(horizontal = 14.dp, vertical = 4.dp)
-                  ) {
-                      Text(
-                          "SCRATCH $displayRate",
-                          color = accent,
-                          fontSize = 11.sp,
-                          fontWeight = FontWeight.Bold
-                      )
-                  }
+                  val displayRate = if (rate < 0f) "\u25C0 REV \u00D7${"%.2f".format(abs(rate))}"
+                                    else "\u25B6 \u00D7${"%.2f".format(rate)}"
+                  Box(modifier = Modifier.align(Alignment.TopCenter).padding(top = 6.dp)
+                      .clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.75f))
+                      .border(1.5.dp, accent, RoundedCornerShape(50))
+                      .padding(horizontal = 10.dp, vertical = 2.dp)
+                  ) { Text("SCRATCH $displayRate", color = accent, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
               }
           }
-
           @Composable
           private fun CornerBrackets(accent: Color) {
               Canvas(modifier = Modifier.fillMaxSize()) {
-                  val w = size.width
-                  val h = size.height
-                  val arm = 24f
-                  val thick = 3f
+                  val w = size.width; val h = size.height; val arm = 20f; val thick = 3f
                   drawLine(accent, Offset(0f, 0f), Offset(arm, 0f), thick)
                   drawLine(accent, Offset(0f, 0f), Offset(0f, arm), thick)
                   drawLine(accent, Offset(w, 0f), Offset(w - arm, 0f), thick)
@@ -1229,121 +1085,46 @@ jobs:
           }
           EOF
 
-      # ==================== EXPAND ====================
-
-      - name: ExpandableDeckManager.kt
-        run: |
-          cat > app/src/main/java/com/djpro/mixer/expand/ExpandableDeckManager.kt << 'EOF'
-          package com.djpro.mixer.expand
-
-          import androidx.compose.runtime.Stable
-          import androidx.compose.runtime.getValue
-          import androidx.compose.runtime.mutableStateOf
-          import androidx.compose.runtime.setValue
-
-          data class DeckLayout(
-              val expandedDeckId: Int? = null,
-              val crossfaderA: Int = 0,
-              val crossfaderB: Int = 1,
-              val videoFullscreen: Boolean = false,
-              val lastExpandedDeckId: Int? = null,
-          )
-
-          @Stable
-          class ExpandableDeckManager {
-              var state by mutableStateOf(DeckLayout()); private set
-              val bigDeckIds: List<Int> get() = buildList {
-                  add(0)
-                  state.expandedDeckId?.takeIf { it > 1 }?.let { add(it) }
-                  add(1)
-              }
-              val miniDeckIds: List<Int> get() = (2..5).filter { it != state.expandedDeckId }
-
-              fun tapDeck(id: Int) {
-                  val current = state.expandedDeckId
-                  if (current == id) collapse() else if (id > 1) expand(id)
-              }
-              fun expand(id: Int) {
-                  state = state.copy(expandedDeckId = id, lastExpandedDeckId = id, crossfaderA = 0, crossfaderB = id)
-              }
-              fun collapse() { state = state.copy(expandedDeckId = null, crossfaderA = 0, crossfaderB = 1) }
-              fun toggleVideoFullscreen() { state = state.copy(videoFullscreen = !state.videoFullscreen) }
-              fun crossfaderLabel(): String = "DECK ${state.crossfaderA + 1}  \u2194  DECK ${state.crossfaderB + 1}"
-          }
-          EOF
-
-      - name: VideoDeckView.kt
-        run: |
-          cat > app/src/main/java/com/djpro/mixer/expand/VideoDeckView.kt << 'EOF'
-          package com.djpro.mixer.expand
-
+          cat > app/src/main/java/com/djpro/mixer/ui/VideoDeckView.kt << 'EOF'
+          package com.djpro.mixer.ui
           import androidx.compose.animation.core.animateFloatAsState
           import androidx.compose.animation.core.tween
           import androidx.compose.foundation.layout.Box
           import androidx.compose.foundation.layout.fillMaxSize
           import androidx.compose.runtime.Composable
           import androidx.compose.runtime.getValue
-          import androidx.compose.runtime.remember
-          import androidx.compose.ui.Alignment
           import androidx.compose.ui.Modifier
-          import androidx.compose.ui.draw.clipToBounds
           import androidx.compose.ui.graphics.Color
           import androidx.compose.ui.graphics.graphicsLayer
           import androidx.compose.ui.viewinterop.AndroidView
           import androidx.media3.ui.PlayerView
           import com.djpro.mixer.audio.DeckPlayer
-          import com.djpro.mixer.ui.ScratchOverlay
-          import kotlin.math.abs
-          import kotlin.random.Random
-
           enum class VideoTransition { CROSSFADE, ZOOM, WIPE }
-
           @Composable
           fun VideoDeckView(
-              deck: DeckPlayer,
-              alpha: Float,
+              deck: DeckPlayer, alpha: Float,
               transition: VideoTransition = VideoTransition.CROSSFADE,
-              accentColor: Color,
+              accentColor: Color = Color.Cyan,
               showScratchOverlay: Boolean = true,
               modifier: Modifier = Modifier
           ) {
-              val scaleTarget = when (transition) {
-                  VideoTransition.ZOOM -> 0.85f + 0.15f * alpha
-                  else -> 1f
-              }
+              val scaleTarget = when (transition) { VideoTransition.ZOOM -> 0.85f + 0.15f * alpha; else -> 1f }
               val scale by animateFloatAsState(scaleTarget, tween(220), label = "vscale")
               val wipeX by animateFloatAsState(
                   when (transition) { VideoTransition.WIPE -> (1f - alpha) * 1200f; else -> 0f },
-                  tween(220), label = "wipe"
-              )
-
+                  tween(220), label = "wipe")
               val scratching = deck.scratching
-              val scratchVelocity = deck.scratchVelocity
-              val scratchRate = deck.scratchRate
-
-              val jitterX: Float
-              val jitterY: Float
-              val stretchX: Float
-              if (scratching) {
-                  val rnd = remember(scratchVelocity) { Random((scratchVelocity * 1000).toInt()) }
-                  jitterX = (rnd.nextFloat() - 0.5f) * 30f * (abs(scratchVelocity) + 0.3f)
-                  jitterY = (rnd.nextFloat() - 0.5f) * 10f * (abs(scratchVelocity) + 0.3f)
-                  stretchX = 1f + (scratchVelocity * 0.05f).coerceIn(-0.08f, 0.08f)
-              } else {
-                  jitterX = 0f; jitterY = 0f; stretchX = 1f
-              }
-
-              Box(modifier = modifier.clipToBounds(), contentAlignment = Alignment.Center) {
+              val vel = deck.scratchVelocity
+              val stretchX = if (scratching) (1f + (vel * 0.03f).coerceIn(-0.06f, 0.06f)) else 1f
+              val jitterX = if (scratching) (vel * 4f).coerceIn(-14f, 14f) else 0f
+              Box(modifier = modifier) {
                   AndroidView(
-                      modifier = Modifier
-                          .fillMaxSize()
-                          .graphicsLayer {
-                              this.alpha = alpha.coerceIn(0f, 1f)
-                              scaleX = scale * stretchX
-                              scaleY = scale
-                              translationX = wipeX + jitterX
-                              translationY = jitterY
-                          },
+                      modifier = Modifier.fillMaxSize().graphicsLayer {
+                          this.alpha = alpha.coerceIn(0f, 1f)
+                          scaleX = scale * stretchX
+                          scaleY = scale
+                          translationX = wipeX + jitterX
+                      },
                       factory = { ctx ->
                           PlayerView(ctx).apply {
                               player = deck.player
@@ -1352,79 +1133,18 @@ jobs:
                           }
                       }
                   )
-
                   if (showScratchOverlay && scratching && alpha > 0.3f) {
-                      ScratchOverlay(
-                          accent = accentColor,
-                          rate = scratchRate,
-                          velocity = scratchVelocity,
-                          modifier = Modifier
-                              .fillMaxSize()
-                              .graphicsLayer { this.alpha = alpha.coerceIn(0f, 1f) }
-                      )
+                      ScratchOverlay(accent = accentColor, rate = deck.scratchRate, velocity = vel,
+                          modifier = Modifier.fillMaxSize().graphicsLayer { this.alpha = alpha.coerceIn(0f, 1f) })
                   }
               }
           }
           EOF
 
-      - name: VideoMixPiP.kt
-        run: |
-          cat > app/src/main/java/com/djpro/mixer/expand/VideoMixPiP.kt << 'EOF'
-          package com.djpro.mixer.expand
-
-          import androidx.compose.foundation.background
-          import androidx.compose.foundation.border
-          import androidx.compose.foundation.gestures.detectDragGestures
-          import androidx.compose.foundation.layout.Box
-          import androidx.compose.foundation.layout.offset
-          import androidx.compose.foundation.layout.padding
-          import androidx.compose.foundation.layout.size
-          import androidx.compose.foundation.shape.RoundedCornerShape
-          import androidx.compose.material3.Text
-          import androidx.compose.runtime.*
-          import androidx.compose.ui.Alignment
-          import androidx.compose.ui.Modifier
-          import androidx.compose.ui.draw.clip
-          import androidx.compose.ui.geometry.Offset
-          import androidx.compose.ui.graphics.Color
-          import androidx.compose.ui.input.pointer.PointerInputChange
-          import androidx.compose.ui.input.pointer.pointerInput
-          import androidx.compose.ui.unit.IntOffset
-          import androidx.compose.ui.unit.dp
-          import androidx.compose.ui.unit.sp
-          import com.djpro.mixer.Neon
-          import kotlin.math.roundToInt
-
-          @Composable
-          fun VideoMixPiP(modifier: Modifier = Modifier) {
-              var dx by remember { mutableStateOf(0f) }
-              var dy by remember { mutableStateOf(0f) }
-              Box(
-                  modifier = modifier
-                      .offset { IntOffset(dx.roundToInt(), dy.roundToInt()) }
-                      .size(180.dp, 100.dp)
-                      .clip(RoundedCornerShape(10.dp))
-                      .background(Color.Black)
-                      .border(1.5.dp, Neon.CYAN.copy(alpha = 0.7f), RoundedCornerShape(10.dp))
-                      .pointerInput(Unit) {
-                          detectDragGestures { change: PointerInputChange, drag: Offset ->
-                              change.consume(); dx += drag.x; dy += drag.y
-                          }
-                      },
-                  contentAlignment = Alignment.BottomStart
-              ) {
-                  Text("VIDEO MIX", color = Neon.CYAN.copy(alpha = 0.8f), fontSize = 9.sp, modifier = Modifier.padding(6.dp))
-              }
-          }
-          EOF
-
-      # ==================== MAIN ====================
-
       - name: MainActivity.kt
         run: |
           cat > app/src/main/java/com/djpro/mixer/MainActivity.kt << 'EOF'
           package com.djpro.mixer
-
           import android.os.Bundle
           import androidx.activity.ComponentActivity
           import androidx.activity.compose.setContent
@@ -1434,36 +1154,41 @@ jobs:
           import androidx.compose.material3.MaterialTheme
           import androidx.compose.ui.Modifier
           import com.djpro.mixer.audio.AudioEngine
-
+          import com.djpro.mixer.video.MixRecorder
           class MainActivity : ComponentActivity() {
               private lateinit var engine: AudioEngine
+              private lateinit var recorder: MixRecorder
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
                   engine = AudioEngine(this)
+                  recorder = MixRecorder(this)
                   val activityRef = this
+                  val engineRef = engine
+                  val recorderRef = recorder
                   setContent {
                       MaterialTheme {
                           Box(modifier = Modifier.fillMaxSize().background(Neon.BG)) {
-                              SixDeckScreen(engine, activityRef)
+                              MainScreen(engineRef, recorderRef, activityRef)
                           }
                       }
                   }
               }
-              override fun onDestroy() { super.onDestroy(); engine.release() }
+              override fun onDestroy() { super.onDestroy(); engine.release(); try { recorder.stop() } catch (_: Throwable) {} }
           }
           EOF
 
-      - name: SixDeckScreen.kt
+      - name: MainScreen.kt
         run: |
-          cat > app/src/main/java/com/djpro/mixer/SixDeckScreen.kt << 'EOF'
+          cat > app/src/main/java/com/djpro/mixer/MainScreen.kt << 'EOF'
           package com.djpro.mixer
 
           import android.app.Activity
           import android.content.Intent
+          import android.media.AudioManager
+          import android.media.ToneGenerator
           import android.net.Uri
           import androidx.activity.compose.rememberLauncherForActivityResult
           import androidx.activity.result.contract.ActivityResultContracts
-          import androidx.compose.animation.core.animateFloatAsState
           import androidx.compose.foundation.background
           import androidx.compose.foundation.border
           import androidx.compose.foundation.clickable
@@ -1472,6 +1197,7 @@ jobs:
           import androidx.compose.foundation.layout.Column
           import androidx.compose.foundation.layout.Row
           import androidx.compose.foundation.layout.Spacer
+          import androidx.compose.foundation.layout.aspectRatio
           import androidx.compose.foundation.layout.fillMaxHeight
           import androidx.compose.foundation.layout.fillMaxSize
           import androidx.compose.foundation.layout.fillMaxWidth
@@ -1489,6 +1215,7 @@ jobs:
           import androidx.compose.material3.SliderDefaults
           import androidx.compose.material3.Text
           import androidx.compose.runtime.Composable
+          import androidx.compose.runtime.DisposableEffect
           import androidx.compose.runtime.LaunchedEffect
           import androidx.compose.runtime.getValue
           import androidx.compose.runtime.mutableFloatStateOf
@@ -1498,7 +1225,6 @@ jobs:
           import androidx.compose.runtime.setValue
           import androidx.compose.ui.Alignment
           import androidx.compose.ui.Modifier
-          import androidx.compose.ui.draw.alpha
           import androidx.compose.ui.draw.clip
           import androidx.compose.ui.graphics.Color
           import androidx.compose.ui.platform.LocalContext
@@ -1507,39 +1233,50 @@ jobs:
           import androidx.compose.ui.unit.dp
           import androidx.compose.ui.unit.sp
           import com.djpro.mixer.audio.AudioEngine
+          import com.djpro.mixer.audio.CrossfaderMode
           import com.djpro.mixer.audio.DeckPlayer
-          import com.djpro.mixer.expand.ExpandableDeckManager
-          import com.djpro.mixer.expand.VideoDeckView
-          import com.djpro.mixer.expand.VideoMixPiP
-          import com.djpro.mixer.expand.VideoTransition
-          import com.djpro.mixer.ui.EqKnob
-          import com.djpro.mixer.ui.JogWheel
-          import com.djpro.mixer.ui.MasterVuMeter
-          import com.djpro.mixer.ui.VerticalFader
-          import com.djpro.mixer.ui.WaveformView
+          import com.djpro.mixer.ui.BeatgridWaveform
+          import com.djpro.mixer.ui.KnobSmall
+          import com.djpro.mixer.ui.MasterVu
+          import com.djpro.mixer.ui.MetalJogWheel
+          import com.djpro.mixer.ui.VideoDeckView
+          import com.djpro.mixer.ui.VideoTransition
+          import com.djpro.mixer.ui.VolumeFader
+          import com.djpro.mixer.video.MixRecorder
           import kotlinx.coroutines.delay
 
-          private const val SAMPLE_VIDEO_1 =
-              "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
-          private const val SAMPLE_VIDEO_2 =
-              "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
+          private const val SAMPLE_VIDEO_1 = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+          private const val SAMPLE_VIDEO_2 = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
+
+          private enum class BottomPanel { NONE, SAMPLER, FX, LIBRARY }
 
           @Composable
-          fun SixDeckScreen(engine: AudioEngine, activity: Activity) {
+          fun MainScreen(engine: AudioEngine, recorder: MixRecorder, activity: Activity) {
               val context = LocalContext.current
-              val manager = remember { ExpandableDeckManager() }
-              val layout = manager.state
-              var crossfaderValue by remember { mutableFloatStateOf(0.5f) }
-              var echoOn by remember { mutableStateOf(false) }
-              var filterOn by remember { mutableStateOf(false) }
-              var flangeOn by remember { mutableStateOf(false) }
-              var reverbOn by remember { mutableStateOf(false) }
-              var recOn by remember { mutableStateOf(false) }
-              var vocalOff by remember { mutableStateOf(false) }
-              var anyPlaying by remember { mutableStateOf(false) }
+              var audioCrossfader by remember { mutableFloatStateOf(0.5f) }
+              var videoCrossfader by remember { mutableFloatStateOf(0.5f) }
+              var crossMode by remember { mutableStateOf(CrossfaderMode.FADE) }
+              var videoTransition by remember { mutableStateOf(VideoTransition.CROSSFADE) }
               var clubMode by remember { mutableStateOf(false) }
-              var transition by remember { mutableStateOf(VideoTransition.CROSSFADE) }
+              var bottomPanel by remember { mutableStateOf(BottomPanel.NONE) }
+              var anyPlaying by remember { mutableStateOf(false) }
+              var bpmMaster by remember { mutableFloatStateOf(128f) }
+              var activeDeckA by remember { mutableStateOf(0) }
+              var activeDeckB by remember { mutableStateOf(1) }
               var pendingDeckId by remember { mutableStateOf<Int?>(null) }
+              var recording by remember { mutableStateOf(false) }
+
+              val toneGen = remember { ToneGenerator(AudioManager.STREAM_MUSIC, 80) }
+              DisposableEffect(Unit) { onDispose { try { toneGen.release() } catch (_: Throwable) {} } }
+
+              val recordLauncher = rememberLauncherForActivityResult(
+                  contract = ActivityResultContracts.StartActivityForResult()
+              ) { result ->
+                  if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+                      val ok = recorder.start(result.resultCode, result.data!!)
+                      recording = ok
+                  }
+              }
 
               val filePicker = rememberLauncherForActivityResult(
                   contract = ActivityResultContracts.OpenDocument()
@@ -1551,480 +1288,485 @@ jobs:
                       engine.loadDeck(id, uri.toString(), name)
                   }
               }
+              fun pickFile(id: Int) { pendingDeckId = id; filePicker.launch(arrayOf("video/*", "audio/*")) }
 
-              fun pickFileForDeck(deckId: Int) {
-                  pendingDeckId = deckId
-                  filePicker.launch(arrayOf("video/*", "audio/*"))
+              fun toggleRecording() {
+                  if (recording) { recorder.stop(); recording = false }
+                  else {
+                      val intent = recorder.buildIntent()
+                      if (intent != null) recordLauncher.launch(intent)
+                  }
               }
 
               LaunchedEffect(Unit) {
-                  while (true) { anyPlaying = engine.decks.any { it.isPlaying }; delay(400) }
+                  while (true) {
+                      anyPlaying = engine.decks.any { it.isPlaying }
+                      bpmMaster = engine.deckA().bpm
+                      delay(400)
+                  }
               }
 
-              Column(
-                  modifier = Modifier.fillMaxSize()
-                      .background(if (clubMode) Neon.CLUB_BG else Neon.BG)
-                      .padding(horizontal = 10.dp, vertical = 8.dp)
-              ) {
-                  TopBar(playing = anyPlaying, clubMode = clubMode, onClubToggle = { clubMode = !clubMode })
+              val deckA = engine.decks[activeDeckA]
+              val deckB = engine.decks[activeDeckB]
+              val accentA = Neon.DECK_COLORS[activeDeckA]
+              val accentB = Neon.DECK_COLORS[activeDeckB]
+
+              Column(modifier = Modifier.fillMaxSize()
+                  .background(if (clubMode) Neon.CLUB_BG else Neon.BG)
+                  .padding(horizontal = 6.dp, vertical = 4.dp)) {
+                  TopBar(bpmMaster = bpmMaster, clubMode = clubMode, onClubToggle = { clubMode = !clubMode }, recording = recording, onRecordToggle = { toggleRecording() })
+                  Spacer(Modifier.height(3.dp))
+                  VideoStrip(deckA = deckA, deckB = deckB, videoCrossfader = videoCrossfader, transition = videoTransition)
+                  Spacer(Modifier.height(2.dp))
+                  VideoControlsRow(videoCrossfader = videoCrossfader, onValueChange = { videoCrossfader = it },
+                      accentA = accentA, accentB = accentB, transition = videoTransition, onTransitionChange = { videoTransition = it })
                   Spacer(Modifier.height(4.dp))
-                  MasterVuMeter(playing = anyPlaying)
-                  Spacer(Modifier.height(8.dp))
-
-                  Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                      Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                          manager.bigDeckIds.forEach { id ->
-                              val isExpanded = id == layout.expandedDeckId
-                              val a by animateFloatAsState(
-                                  targetValue = if (layout.expandedDeckId == null || isExpanded) 1f else 0.6f,
-                                  label = "focus"
-                              )
-                              BigDeckPanel(
-                                  deck = engine.decks[id], engine = engine,
-                                  title = "DECK ${id + 1}", accent = Neon.DECK_COLORS[id],
-                                  isExpanded = isExpanded,
-                                  onPlayPause = { engine.togglePlay(id) },
-                                  onPickFile = { pickFileForDeck(id) },
-                                  onLoadSample = {
-                                      val url = if (id == 0) SAMPLE_VIDEO_1 else SAMPLE_VIDEO_2
-                                      engine.loadDeck(id, url, "Sample ${id + 1}")
-                                  },
-                                  onScratch = { rate -> engine.scratch(id, rate) },
-                                  onScratchEnd = { engine.endScratch(id) },
-                                  onSpinback = { engine.spinback(id) },
-                                  onBrake = { engine.brake(id) },
-                                  onVocalToggle = { vocalOff = !vocalOff; engine.setVocalRemoval(vocalOff) },
-                                  onSetCue = { slot -> engine.setCue(id, slot) },
-                                  onJumpCue = { slot -> engine.jumpCue(id, slot) },
-                                  onToggleLoop = { beats -> engine.toggleLoop(id, beats) },
-                                  onSync = { val other = if (id == 0) 1 else 0; engine.syncBpm(other, id) },
-                                  modifier = Modifier.weight(1f).fillMaxHeight().alpha(a)
-                                      .clickable { manager.tapDeck(id) }
-                              )
-                          }
-
-                          if (!layout.videoFullscreen) {
-                              Box(modifier = Modifier.weight(1.4f).fillMaxHeight()) {
-                                  CenterVideoPanel(
-                                      engine = engine, transition = transition,
-                                      onTransitionChange = { transition = it },
-                                      crossfaderValue = crossfaderValue,
-                                      onCrossfaderChange = { crossfaderValue = it; engine.setCrossfader(it) },
-                                      echoOn = echoOn, filterOn = filterOn,
-                                      flangeOn = flangeOn, reverbOn = reverbOn,
-                                      recOn = recOn, vocalOff = vocalOff,
-                                      onEchoToggle = { echoOn = !echoOn; engine.setEcho(echoOn) },
-                                      onFilterToggle = { filterOn = !filterOn; engine.setFilter(filterOn) },
-                                      onFlangeToggle = { flangeOn = !flangeOn },
-                                      onReverbToggle = { reverbOn = !reverbOn },
-                                      onRecToggle = { recOn = !recOn },
-                                      onVocalToggle = { vocalOff = !vocalOff; engine.setVocalRemoval(vocalOff) }
-                                  )
-                              }
-                          } else { Spacer(Modifier.weight(1.4f)) }
-                      }
-
-                      if (layout.expandedDeckId != null && (layout.expandedDeckId ?: 0) > 1) {
-                          VideoMixPiP(modifier = Modifier.align(Alignment.TopEnd).padding(top = 4.dp))
-                      }
+                  Row(modifier = Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                      DeckPanel(deck = deckA, accent = accentA, label = "DECK A",
+                          onPickFile = { pickFile(activeDeckA) }, onPlay = { engine.togglePlay(activeDeckA) },
+                          onSync = { engine.syncBpm(activeDeckB, activeDeckA) }, onCue = { engine.setCue(activeDeckA, 0) },
+                          onJumpCue = { slot -> engine.jumpCue(activeDeckA, slot) },
+                          onSetCue = { slot -> engine.setCue(activeDeckA, slot) },
+                          onToggleLoop = { beats -> engine.toggleLoop(activeDeckA, beats) },
+                          onSpinback = { engine.spinback(activeDeckA) }, onBrake = { engine.brake(activeDeckA) },
+                          onScratchStart = { engine.beginScratch(activeDeckA) },
+                          onScratchMove = { dy -> engine.scratchMove(activeDeckA, dy) },
+                          onScratchEnd = { engine.endScratch(activeDeckA) },
+                          onEqChange = { low, mid, high -> engine.setEq(activeDeckA, low, mid, high) },
+                          onStemsChange = { drm, bas, oth -> engine.setStemMutes(drm, bas, oth) },
+                          modifier = Modifier.weight(1f).fillMaxHeight())
+                      CenterMixer(engine = engine, audioCrossfader = audioCrossfader,
+                          onAudioCrossfaderChange = { audioCrossfader = it; engine.setCrossfader(it) },
+                          crossMode = crossMode, onCrossModeChange = { crossMode = it; engine.setCrossfaderMode(it) },
+                          anyPlaying = anyPlaying, modifier = Modifier.width(160.dp).fillMaxHeight())
+                      DeckPanel(deck = deckB, accent = accentB, label = "DECK B",
+                          onPickFile = { pickFile(activeDeckB) }, onPlay = { engine.togglePlay(activeDeckB) },
+                          onSync = { engine.syncBpm(activeDeckA, activeDeckB) }, onCue = { engine.setCue(activeDeckB, 0) },
+                          onJumpCue = { slot -> engine.jumpCue(activeDeckB, slot) },
+                          onSetCue = { slot -> engine.setCue(activeDeckB, slot) },
+                          onToggleLoop = { beats -> engine.toggleLoop(activeDeckB, beats) },
+                          onSpinback = { engine.spinback(activeDeckB) }, onBrake = { engine.brake(activeDeckB) },
+                          onScratchStart = { engine.beginScratch(activeDeckB) },
+                          onScratchMove = { dy -> engine.scratchMove(activeDeckB, dy) },
+                          onScratchEnd = { engine.endScratch(activeDeckB) },
+                          onEqChange = { low, mid, high -> engine.setEq(activeDeckB, low, mid, high) },
+                          onStemsChange = { drm, bas, oth -> engine.setStemMutes(drm, bas, oth) },
+                          modifier = Modifier.weight(1f).fillMaxHeight())
                   }
-
-                  Spacer(Modifier.height(8.dp))
-
-                  Row(modifier = Modifier.fillMaxWidth().height(130.dp),
-                      horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                      manager.miniDeckIds.forEach { id ->
-                          MiniDeckPanel(
-                              deck = engine.decks[id], title = "DECK ${id + 1}",
-                              accent = Neon.DECK_COLORS[id],
-                              onPlayPause = { engine.togglePlay(id) },
-                              onPickFile = { pickFileForDeck(id) },
-                              modifier = Modifier.weight(1f).fillMaxHeight().clickable { manager.tapDeck(id) }
-                          )
-                      }
-                      repeat(4 - manager.miniDeckIds.size) { Spacer(Modifier.weight(1f)) }
+                  Spacer(Modifier.height(4.dp))
+                  if (bottomPanel == BottomPanel.SAMPLER) {
+                      SamplerDrawer(onPlayTone = { tone -> try { toneGen.startTone(tone, 180) } catch (_: Throwable) {} })
+                      Spacer(Modifier.height(4.dp))
+                  } else if (bottomPanel == BottomPanel.FX) {
+                      FxDrawer(engine = engine, deckA = activeDeckA); Spacer(Modifier.height(4.dp))
+                  } else if (bottomPanel == BottomPanel.LIBRARY) {
+                      LibraryDrawer(
+                          onPickForA = { pickFile(activeDeckA) }, onPickForB = { pickFile(activeDeckB) },
+                          onLoadSampleA = { engine.loadDeck(activeDeckA, SAMPLE_VIDEO_1, "Sample A") },
+                          onLoadSampleB = { engine.loadDeck(activeDeckB, SAMPLE_VIDEO_2, "Sample B") })
+                      Spacer(Modifier.height(4.dp))
                   }
+                  BottomBar(activePanel = bottomPanel,
+                      onTogglePanel = { p -> bottomPanel = if (bottomPanel == p) BottomPanel.NONE else p },
+                      activeDeckA = activeDeckA, activeDeckB = activeDeckB,
+                      onSwapA = { id -> engine.swapToA(id); activeDeckA = id },
+                      onSwapB = { id -> engine.swapToB(id); activeDeckB = id },
+                      onLoadSample = { id -> val url = if (id % 2 == 0) SAMPLE_VIDEO_1 else SAMPLE_VIDEO_2; engine.loadDeck(id, url, "Sample ${id + 1}") })
               }
           }
 
           @Composable
-          private fun TopBar(playing: Boolean, clubMode: Boolean, onClubToggle: () -> Unit) {
-              Row(modifier = Modifier.fillMaxWidth(),
-                  horizontalArrangement = Arrangement.SpaceBetween,
-                  verticalAlignment = Alignment.CenterVertically) {
-                  Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(Neon.PANEL)
-                      .border(1.dp, Neon.CYAN.copy(alpha = 0.5f), CircleShape),
-                      contentAlignment = Alignment.Center) { Icon(Icons.Filled.Menu, "menu", tint = Neon.CYAN) }
-
+          private fun TopBar(bpmMaster: Float, clubMode: Boolean, onClubToggle: () -> Unit, recording: Boolean, onRecordToggle: () -> Unit) {
+              Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                   Row(verticalAlignment = Alignment.CenterVertically) {
-                      Text("DJ PRO MIXER", color = Neon.CYAN, fontSize = 22.sp, fontWeight = FontWeight.Bold, letterSpacing = 8.sp)
-                      Spacer(Modifier.width(12.dp))
-                      Box(modifier = Modifier.size(8.dp).clip(CircleShape)
-                          .background(if (playing) Neon.LIVE else Neon.RED.copy(alpha = 0.5f)))
+                      Box(modifier = Modifier.size(26.dp).clip(CircleShape).background(Neon.PANEL)
+                          .border(1.dp, Neon.CYAN.copy(alpha = 0.5f), CircleShape), contentAlignment = Alignment.Center) {
+                          Icon(Icons.Filled.Menu, "menu", tint = Neon.CYAN, modifier = Modifier.size(15.dp))
+                      }
+                      Spacer(Modifier.width(8.dp))
+                      Text("DJ PRO MIXER", color = Neon.CYAN, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 4.sp)
                   }
-
+                  Text("BPM MASTER  ${"%.1f".format(bpmMaster)}", color = Neon.TEXT, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
                   Row(verticalAlignment = Alignment.CenterVertically) {
+                      Box(modifier = Modifier.clip(RoundedCornerShape(50))
+                          .background(if (recording) Neon.RED.copy(alpha = 0.5f) else Neon.PANEL)
+                          .border(1.dp, Neon.RED.copy(alpha = 0.7f), RoundedCornerShape(50))
+                          .clickable { onRecordToggle() }.padding(horizontal = 8.dp, vertical = 4.dp)) {
+                          Row(verticalAlignment = Alignment.CenterVertically) {
+                              Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(Neon.RED))
+                              Spacer(Modifier.width(4.dp))
+                              Text(if (recording) "STOP" else "REC", color = Neon.RED, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                          }
+                      }
+                      Spacer(Modifier.width(6.dp))
                       Box(modifier = Modifier.clip(RoundedCornerShape(50))
                           .background(if (clubMode) Neon.CYAN.copy(alpha = 0.3f) else Neon.PANEL)
                           .border(1.dp, Neon.CYAN.copy(alpha = 0.5f), RoundedCornerShape(50))
-                          .clickable { onClubToggle() }.padding(horizontal = 12.dp, vertical = 6.dp)
-                      ) { Text(if (clubMode) "CLUB ON" else "CLUB", color = Neon.CYAN, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
-                      Spacer(Modifier.width(8.dp))
-                      Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(Neon.PANEL)
-                          .border(1.dp, Neon.CYAN.copy(alpha = 0.5f), CircleShape),
-                          contentAlignment = Alignment.Center) { Icon(Icons.Filled.Settings, "settings", tint = Neon.CYAN) }
+                          .clickable { onClubToggle() }.padding(horizontal = 8.dp, vertical = 4.dp)) {
+                          Text(if (clubMode) "CLUB ON" else "CLUB", color = Neon.CYAN, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                      }
+                      Spacer(Modifier.width(6.dp))
+                      Box(modifier = Modifier.size(26.dp).clip(CircleShape).background(Neon.PANEL)
+                          .border(1.dp, Neon.CYAN.copy(alpha = 0.5f), CircleShape), contentAlignment = Alignment.Center) {
+                          Icon(Icons.Filled.Settings, "settings", tint = Neon.CYAN, modifier = Modifier.size(15.dp))
+                      }
                   }
               }
           }
 
           @Composable
-          private fun BigDeckPanel(
-              deck: DeckPlayer, engine: AudioEngine, title: String, accent: Color,
-              isExpanded: Boolean,
-              onPlayPause: () -> Unit, onPickFile: () -> Unit, onLoadSample: () -> Unit,
-              onScratch: (Float) -> Unit, onScratchEnd: () -> Unit,
-              onSpinback: () -> Unit, onBrake: () -> Unit, onVocalToggle: () -> Unit,
-              onSetCue: (Int) -> Unit, onJumpCue: (Int) -> Unit, onToggleLoop: (Int) -> Unit,
-              onSync: () -> Unit, modifier: Modifier = Modifier
+          private fun VideoStrip(deckA: DeckPlayer, deckB: DeckPlayer, videoCrossfader: Float, transition: VideoTransition) {
+              Box(modifier = Modifier.fillMaxWidth().aspectRatio(21f / 9f)
+                  .clip(RoundedCornerShape(6.dp)).background(Color.Black)
+                  .border(1.dp, Neon.CYAN.copy(alpha = 0.55f), RoundedCornerShape(6.dp))) {
+                  VideoDeckView(deck = deckA, alpha = 1f, transition = transition, accentColor = Neon.CYAN, modifier = Modifier.fillMaxSize())
+                  VideoDeckView(deck = deckB, alpha = 1f - videoCrossfader, transition = transition, accentColor = Neon.MAGENTA, modifier = Modifier.fillMaxSize())
+                  Box(modifier = Modifier.align(Alignment.TopStart).padding(5.dp)
+                      .clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.6f))
+                      .border(1.dp, Neon.CYAN.copy(alpha = 0.7f), RoundedCornerShape(50))
+                      .padding(horizontal = 8.dp, vertical = 2.dp)) {
+                      Text("VIDEO", color = Neon.CYAN, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                  }
+                  Box(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 4.dp)
+                      .clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.55f))
+                      .padding(horizontal = 8.dp, vertical = 2.dp)) {
+                      Text("VIDEO MIX", color = Color.White.copy(alpha = 0.85f), fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
+                  }
+                  Row(modifier = Modifier.align(Alignment.TopEnd).padding(5.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                      Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(if (deckA.isPlaying) Neon.LIVE else Color(0x4000E5FF)))
+                      Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(if (deckB.isPlaying) Neon.LIVE else Color(0x40FF2BD6)))
+                  }
+              }
+          }
+
+          @Composable
+          private fun VideoControlsRow(videoCrossfader: Float, onValueChange: (Float) -> Unit,
+                                       accentA: Color, accentB: Color,
+                                       transition: VideoTransition, onTransitionChange: (VideoTransition) -> Unit) {
+              Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                  verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                  Text("\u25C0", color = accentA, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                  Slider(value = videoCrossfader, onValueChange = onValueChange,
+                      colors = SliderDefaults.colors(thumbColor = Neon.CYAN,
+                          activeTrackColor = accentA.copy(alpha = 0.7f),
+                          inactiveTrackColor = accentB.copy(alpha = 0.7f)),
+                      modifier = Modifier.weight(1f).height(18.dp))
+                  Text("\u25B6", color = accentB, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                  for (t in VideoTransition.values()) {
+                      val sel = t == transition
+                      Box(modifier = Modifier.clip(RoundedCornerShape(50))
+                          .background(if (sel) Neon.CYAN.copy(alpha = 0.3f) else Neon.BTN_BG)
+                          .border(1.dp, Neon.CYAN.copy(alpha = if (sel) 1f else 0.3f), RoundedCornerShape(50))
+                          .clickable { onTransitionChange(t) }.padding(horizontal = 6.dp, vertical = 2.dp)) {
+                          Text(t.name, color = Neon.CYAN, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+                      }
+                  }
+              }
+          }
+
+          @Composable
+          private fun DeckPanel(
+              deck: DeckPlayer, accent: Color, label: String,
+              onPickFile: () -> Unit, onPlay: () -> Unit, onSync: () -> Unit, onCue: () -> Unit,
+              onJumpCue: (Int) -> Unit, onSetCue: (Int) -> Unit, onToggleLoop: (Int) -> Unit,
+              onSpinback: () -> Unit, onBrake: () -> Unit,
+              onScratchStart: () -> Unit, onScratchMove: (Float) -> Unit, onScratchEnd: () -> Unit,
+              onEqChange: (Float, Float, Float) -> Unit,
+              onStemsChange: (Boolean, Boolean, Boolean) -> Unit,
+              modifier: Modifier = Modifier
           ) {
               var positionMs by remember { mutableLongStateOf(0L) }
               var durationMs by remember { mutableLongStateOf(0L) }
+              var hiVal by remember { mutableFloatStateOf(0f) }
+              var midVal by remember { mutableFloatStateOf(0f) }
+              var lowVal by remember { mutableFloatStateOf(0f) }
+              var killActive by remember { mutableStateOf(false) }
+              var drmMute by remember { mutableStateOf(false) }
+              var basMute by remember { mutableStateOf(false) }
+              var othMute by remember { mutableStateOf(false) }
               val isPlaying = deck.isPlaying
               val scratching = deck.scratching
-              val scratchRate = deck.scratchRate
+              val speed = deck.currentSpeed()
 
-              LaunchedEffect(deck) {
-                  while (true) {
-                      positionMs = deck.positionMs(); durationMs = deck.durationMs(); delay(500)
-                  }
-              }
+              LaunchedEffect(deck) { while (true) { positionMs = deck.positionMs(); durationMs = deck.durationMs(); delay(400) } }
 
-              Column(
-                  modifier = modifier
-                      .clip(RoundedCornerShape(16.dp))
-                      .background(if (scratching) accent.copy(alpha = 0.10f) else Neon.PANEL)
-                      .border(
-                          width = if (isExpanded || scratching) 2.dp else 1.5.dp,
-                          color = accent.copy(alpha = if (isExpanded || scratching) 1f else 0.7f),
-                          shape = RoundedCornerShape(16.dp)
-                      ).padding(8.dp),
-                  verticalArrangement = Arrangement.spacedBy(4.dp)
-              ) {
-                  Row(modifier = Modifier.fillMaxWidth(),
-                      horizontalArrangement = Arrangement.SpaceBetween,
-                      verticalAlignment = Alignment.CenterVertically) {
-                      Text(title, color = accent, fontSize = 14.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+              Column(modifier = modifier.clip(RoundedCornerShape(10.dp))
+                  .background(if (scratching) accent.copy(alpha = 0.08f) else Neon.PANEL)
+                  .border(if (scratching) 2.dp else 1.dp, accent.copy(alpha = if (scratching) 1f else 0.55f), RoundedCornerShape(10.dp))
+                  .padding(6.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                  Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                       Row(verticalAlignment = Alignment.CenterVertically) {
-                          Box(modifier = Modifier.size(7.dp).clip(CircleShape)
-                              .background(
-                                  when {
-                                      scratching -> Neon.YELLOW
-                                      isPlaying -> Neon.LIVE
-                                      else -> accent.copy(alpha = 0.4f)
-                                  }
-                              ))
+                          Text(label, color = accent, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
                           Spacer(Modifier.width(5.dp))
-                          Text(
-                              text = when {
-                                  scratching -> "SCRATCH \u00D7${"%.2f".format(scratchRate)}"
-                                  isPlaying -> "LIVE"
-                                  else -> "READY"
-                              },
-                              color = when {
-                                  scratching -> Neon.YELLOW
-                                  isPlaying -> Neon.LIVE
-                                  else -> Neon.TEXT_DIM
-                              },
-                              fontSize = 10.sp, fontWeight = FontWeight.Bold
-                          )
+                          Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(if (scratching) Neon.YELLOW else accent))
                       }
+                      Text(text = when { scratching -> "SCR \u00D7${"%.2f".format(deck.scratchRate)}"; isPlaying -> "LIVE"; else -> "READY" },
+                          color = when { scratching -> Neon.YELLOW; isPlaying -> Neon.LIVE; else -> Neon.TEXT_DIM },
+                          fontSize = 8.sp, fontWeight = FontWeight.Bold)
                   }
-
-                  if (deck.isLoaded && deck.loadedName.isNotEmpty()) {
-                      Text(deck.loadedName, color = accent.copy(alpha = 0.7f), fontSize = 9.sp,
-                          maxLines = 1, overflow = TextOverflow.Ellipsis)
-                  }
-
-                  WaveformView(accent = accent, seed = deck.index * 17 + 3, barCount = 70)
-
+                  Text(text = if (deck.loadedName.isNotEmpty()) deck.loadedName else "Tap LOAD to pick",
+                      color = Neon.TEXT, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                   Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                      Text("${fmt(positionMs)} / ${fmt(if (durationMs > 0) durationMs else 195000L)}",
-                          color = accent.copy(alpha = 0.9f), fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                      Text("BPM ${if (deck.bpm > 0) "%.1f".format(deck.bpm) else "126.0"}",
-                          color = accent.copy(alpha = 0.7f), fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                      Text(if (deck.loopActive) "LOOP ${deck.loopBeats}" else "NO LOOP",
-                          color = if (deck.loopActive) Neon.LIVE else accent.copy(alpha = 0.5f),
-                          fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                      Text("${fmt(positionMs)} / ${fmt(if (durationMs > 0) durationMs else 0L)}",
+                          color = accent.copy(alpha = 0.8f), fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                      Text("BPM ${"%.1f".format(deck.bpm)}  |  ${"%.0f".format(speed * 100)}%",
+                          color = accent.copy(alpha = 0.7f), fontSize = 8.sp, fontWeight = FontWeight.Bold)
                   }
-
-                  Row(modifier = Modifier.fillMaxWidth().weight(1f),
-                      horizontalArrangement = Arrangement.spacedBy(6.dp),
-                      verticalAlignment = Alignment.CenterVertically) {
-                      VerticalFader(accent = accent, modifier = Modifier.fillMaxHeight())
-                      Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                          JogWheel(accent = accent, size = 130.dp, isPlaying = isPlaying,
-                              onScratch = onScratch, onScratchEnd = onScratchEnd)
-                      }
-                      Column(verticalArrangement = Arrangement.spacedBy(3.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                          EqKnob("HI", accent, onValueChange = { engine.setEq(deck.index, deck.eq.lowGainDb, deck.eq.midGainDb, it) })
-                          EqKnob("MID", accent, onValueChange = { engine.setEq(deck.index, deck.eq.lowGainDb, it, deck.eq.highGainDb) })
-                          EqKnob("LOW", accent, onValueChange = { engine.setEq(deck.index, it, deck.eq.midGainDb, deck.eq.highGainDb) })
+                  BeatgridWaveform(accent = accent, seed = deck.index * 31 + 7, barCount = 100)
+                  Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                      MetalJogWheel(accent = accent, size = 100.dp, isPlaying = isPlaying,
+                          onScratchStart = onScratchStart, onScratchMove = onScratchMove, onScratchEnd = onScratchEnd)
+                  }
+                  Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                      PillBtn("SYNC", accent, false, onSync, Modifier.weight(1f))
+                      PillBtn("CUE", accent, false, onCue, Modifier.weight(1f))
+                      PillBtn("\u25B6 PLAY", accent, isPlaying, onPlay, Modifier.weight(1.4f))
+                  }
+                  Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                      for (b in intArrayOf(1, 2, 4, 8, 16)) {
+                          PillBtn("$b", accent, deck.loopActive && deck.loopBeats == b, { onToggleLoop(b) }, Modifier.weight(1f))
                       }
                   }
-
-                  Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(4.dp)) {
-                      TransportBtn("SPIN", accent, onSpinback, Modifier.weight(1f))
-                      TransportBtn("BRAKE", accent, onBrake, Modifier.weight(1f))
-                      TransportBtn("SYNC", accent, onSync, Modifier.weight(1f))
-                  }
-
-                  Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(4.dp)) {
-                      for (b in intArrayOf(1,2,4,8,16)) {
-                          TransportBtn("$b", accent, { onToggleLoop(b) }, Modifier.weight(1f))
-                      }
-                  }
-
-                  Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(4.dp)) {
+                  Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                       for (i in 0..3) {
-                          val hasCue = deck.cuePoints.getOrNull(i) ?: -1L >= 0
-                          CuePad(i, accent, hasCue, { onSetCue(i) }, { onJumpCue(i) }, Modifier.weight(1f))
+                          val has = deck.cuePoints.getOrNull(i) ?: -1L >= 0
+                          CuePad(i, accent, has, { onSetCue(i) }, { onJumpCue(i) }, Modifier.weight(1f))
                       }
                   }
-                  Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(4.dp)) {
+                  Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                       for (i in 4..7) {
-                          val hasCue = deck.cuePoints.getOrNull(i) ?: -1L >= 0
-                          CuePad(i, accent, hasCue, { onSetCue(i) }, { onJumpCue(i) }, Modifier.weight(1f))
+                          val has = deck.cuePoints.getOrNull(i) ?: -1L >= 0
+                          CuePad(i, accent, has, { onSetCue(i) }, { onJumpCue(i) }, Modifier.weight(1f))
                       }
                   }
-
-                  Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(4.dp)) {
-                      StemButton("VOX", accent, onVocalToggle, Modifier.weight(1f))
-                      StemButton("DRM", accent, {}, Modifier.weight(1f))
-                      StemButton("BAS", accent, {}, Modifier.weight(1f))
-                      StemButton("OTH", accent, {}, Modifier.weight(1f))
+                  Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                      StemBtn("VOX", accent, false, {}, Modifier.weight(1f))
+                      StemBtn("DRM", accent, drmMute, { drmMute = !drmMute; onStemsChange(drmMute, basMute, othMute) }, Modifier.weight(1f))
+                      StemBtn("BAS", accent, basMute, { basMute = !basMute; onStemsChange(drmMute, basMute, othMute) }, Modifier.weight(1f))
+                      StemBtn("OTH", accent, othMute, { othMute = !othMute; onStemsChange(drmMute, basMute, othMute) }, Modifier.weight(1f))
                   }
-
-                  Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(4.dp)) {
-                      TransportBtn("PICK", accent, onPickFile, Modifier.weight(1.4f))
-                      TransportBtn("SAMPLE", accent, onLoadSample, Modifier.weight(1f))
-                      TransportBtn("\u25B6", accent, onPlayPause, Modifier.weight(1.2f))
+                  Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                      Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                          KnobSmall("HI", accent, hiVal, onValueChange = { hiVal = it; onEqChange(lowVal, midVal, it) })
+                      }
+                      Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                          KnobSmall("MID", accent, midVal, onValueChange = { midVal = it; onEqChange(lowVal, it, hiVal) })
+                      }
+                      Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                          KnobSmall("LOW", accent, lowVal, onValueChange = { lowVal = it; onEqChange(it, midVal, hiVal) })
+                      }
+                      Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                          Box(modifier = Modifier.size(34.dp).clip(CircleShape)
+                              .background(if (killActive) accent.copy(alpha = 0.4f) else Neon.BTN_BG)
+                              .border(1.5.dp, accent.copy(alpha = if (killActive) 1f else 0.5f), CircleShape)
+                              .clickable {
+                                  killActive = !killActive
+                                  if (killActive) onEqChange(-26f, -26f, -26f)
+                                  else { lowVal = 0f; midVal = 0f; hiVal = 0f; onEqChange(0f, 0f, 0f) }
+                              }, contentAlignment = Alignment.Center) {
+                              Text("KILL", color = accent, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+                          }
+                      }
+                  }
+                  Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                      PillBtn("SPIN", accent, false, onSpinback, Modifier.weight(1f))
+                      PillBtn("BRAKE", accent, false, onBrake, Modifier.weight(1f))
+                      PillBtn("LOAD", accent, false, onPickFile, Modifier.weight(1.2f))
                   }
               }
           }
 
           @Composable
           private fun CuePad(index: Int, accent: Color, hasCue: Boolean, onSet: () -> Unit, onJump: () -> Unit, modifier: Modifier = Modifier) {
-              Box(modifier = modifier.clip(RoundedCornerShape(6.dp))
+              Box(modifier = modifier.clip(RoundedCornerShape(4.dp))
                   .background(if (hasCue) accent.copy(alpha = 0.35f) else Neon.BTN_BG)
-                  .border(1.dp, accent.copy(alpha = if (hasCue) 1f else 0.35f), RoundedCornerShape(6.dp))
-                  .clickable { if (hasCue) onJump() else onSet() }.padding(vertical = 8.dp),
+                  .border(1.dp, accent.copy(alpha = if (hasCue) 1f else 0.35f), RoundedCornerShape(4.dp))
+                  .clickable { if (hasCue) onJump() else onSet() }.padding(vertical = 5.dp),
                   contentAlignment = Alignment.Center) {
-                  Text(if (hasCue) "C${index + 1}" else "+${index + 1}", color = accent, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                  Text(if (hasCue) "C${index + 1}" else "+${index + 1}", color = accent, fontSize = 7.sp, fontWeight = FontWeight.Bold)
               }
           }
 
           @Composable
-          private fun MiniDeckPanel(
-              deck: DeckPlayer, title: String, accent: Color,
-              onPlayPause: () -> Unit, onPickFile: () -> Unit, modifier: Modifier = Modifier
-          ) {
-              var positionMs by remember { mutableLongStateOf(0L) }
-              var durationMs by remember { mutableLongStateOf(0L) }
-              val isPlaying = deck.isPlaying
-
-              LaunchedEffect(deck) {
-                  while (true) { positionMs = deck.positionMs(); durationMs = deck.durationMs(); delay(700) }
-              }
-
-              Column(modifier = modifier.clip(RoundedCornerShape(14.dp)).background(Neon.PANEL)
-                  .border(1.5.dp, accent.copy(alpha = 0.6f), RoundedCornerShape(14.dp)).padding(8.dp),
-                  verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                  Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
-                      verticalAlignment = Alignment.CenterVertically) {
-                      Text(title, color = accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                      Row(verticalAlignment = Alignment.CenterVertically) {
-                          Box(modifier = Modifier.size(6.dp).clip(CircleShape)
-                              .background(if (isPlaying) Neon.LIVE else accent.copy(alpha = 0.5f)))
-                          Spacer(Modifier.width(4.dp))
-                          Text(if (isPlaying) "LIVE" else "READY",
-                              color = if (isPlaying) Neon.LIVE else accent.copy(alpha = 0.7f),
-                              fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                      }
-                  }
-                  Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                      JogWheel(accent = accent, size = 52.dp, isPlaying = isPlaying, onScratch = {}, onScratchEnd = {})
-                  }
-                  WaveformView(accent = accent, barCount = 50, seed = deck.index * 13 + 5)
-                  Row(modifier = Modifier.fillMaxWidth()) {
-                      Text("${fmt(positionMs)} / ${fmt(if (durationMs > 0) durationMs else 175000L)}",
-                          color = accent.copy(alpha = 0.85f), fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                  }
-                  Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(4.dp)) {
-                      TransportBtn("PICK", accent, onPickFile, Modifier.weight(1f))
-                      TransportBtn("PLAY", accent, onPlayPause, Modifier.weight(1f))
-                  }
+          private fun StemBtn(label: String, accent: Color, active: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+              Box(modifier = modifier.clip(RoundedCornerShape(4.dp))
+                  .background(if (active) accent.copy(alpha = 0.4f) else Neon.BTN_BG)
+                  .border(1.dp, accent.copy(alpha = if (active) 1f else 0.35f), RoundedCornerShape(4.dp))
+                  .clickable { onClick() }.padding(vertical = 5.dp), contentAlignment = Alignment.Center) {
+                  Text(label, color = accent, fontSize = 7.sp, fontWeight = FontWeight.Bold)
               }
           }
 
           @Composable
-          private fun CenterVideoPanel(
-              engine: AudioEngine, transition: VideoTransition,
-              onTransitionChange: (VideoTransition) -> Unit,
-              crossfaderValue: Float, onCrossfaderChange: (Float) -> Unit,
-              echoOn: Boolean, filterOn: Boolean, flangeOn: Boolean, reverbOn: Boolean,
-              recOn: Boolean, vocalOff: Boolean,
-              onEchoToggle: () -> Unit, onFilterToggle: () -> Unit,
-              onFlangeToggle: () -> Unit, onReverbToggle: () -> Unit,
-              onRecToggle: () -> Unit, onVocalToggle: () -> Unit
-          ) {
-              val deck0 = engine.decks[0]
-              val deck1 = engine.decks[1]
-              val scratch0 = deck0.scratching
-              val scratch1 = deck1.scratching
-
-              Column(modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp))
-                  .background(Neon.PANEL)
-                  .border(
-                      width = if (scratch0 || scratch1) 3.dp else 1.5.dp,
-                      color = when {
-                          scratch0 && scratch1 -> Neon.YELLOW
-                          scratch0 -> Neon.CYAN
-                          scratch1 -> Neon.MAGENTA
-                          else -> Color(0xFF2A2A3A)
-                      },
-                      shape = RoundedCornerShape(16.dp)
-                  ).padding(10.dp),
-                  verticalArrangement = Arrangement.spacedBy(6.dp)) {
-
-                  Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
-                      verticalAlignment = Alignment.CenterVertically) {
-                      Box(modifier = Modifier.clip(RoundedCornerShape(50)).background(Neon.DEEP)
-                          .border(
-                              width = if (scratch0 || scratch1) 2.dp else 1.5.dp,
-                              color = if (scratch0 || scratch1) Neon.YELLOW else Neon.CYAN.copy(alpha = 0.7f),
-                              shape = RoundedCornerShape(50)
-                          ).padding(horizontal = 14.dp, vertical = 3.dp)
-                      ) {
-                          Text(
-                              text = when {
-                                  scratch0 && scratch1 -> "\u26A1 BOTH SCRATCHING"
-                                  scratch0 -> "\u26A1 DECK 1 SCRATCH"
-                                  scratch1 -> "\u26A1 DECK 2 SCRATCH"
-                                  else -> "VIDEO MIX"
-                              },
-                              color = if (scratch0 || scratch1) Neon.YELLOW else Neon.CYAN,
-                              fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp
-                          )
+          private fun CenterMixer(engine: AudioEngine, audioCrossfader: Float, onAudioCrossfaderChange: (Float) -> Unit,
+                                  crossMode: CrossfaderMode, onCrossModeChange: (CrossfaderMode) -> Unit,
+                                  anyPlaying: Boolean, modifier: Modifier = Modifier) {
+              Column(modifier = modifier.clip(RoundedCornerShape(10.dp))
+                  .background(Neon.PANEL_DARK)
+                  .border(1.dp, Color(0xFF1E1E2E), RoundedCornerShape(10.dp))
+                  .padding(6.dp),
+                  horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                  Text("MIXER", color = Neon.TEXT_DIM, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
+                  Row(modifier = Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                      Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                          Text("A", color = Neon.CYAN, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                          Spacer(Modifier.height(2.dp))
+                          Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                              VolumeFader(accent = Neon.CYAN, initialValue = 0.75f)
+                          }
                       }
-                      Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                          for (t in VideoTransition.values()) {
-                              val selected = t == transition
-                              Box(modifier = Modifier.clip(RoundedCornerShape(50))
-                                  .background(if (selected) Neon.CYAN.copy(alpha = 0.3f) else Neon.BTN_BG)
-                                  .border(1.dp, Neon.CYAN.copy(alpha = if (selected) 1f else 0.3f), RoundedCornerShape(50))
-                                  .clickable { onTransitionChange(t) }.padding(horizontal = 8.dp, vertical = 3.dp)
-                              ) { Text(t.name, color = Neon.CYAN, fontSize = 8.sp, fontWeight = FontWeight.Bold) }
+                      Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                          Text("B", color = Neon.MAGENTA, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                          Spacer(Modifier.height(2.dp))
+                          Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                              VolumeFader(accent = Neon.MAGENTA, initialValue = 0.80f)
+                          }
+                      }
+                      Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                          Text("VU", color = Neon.TEXT, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                          Spacer(Modifier.height(2.dp))
+                          Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                              MasterVu(playing = anyPlaying)
                           }
                       }
                   }
+                  Text("MASTER", color = Neon.TEXT_DIM, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                  Text("CROSSFADER", color = Neon.TEXT_DIM, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                  Slider(value = audioCrossfader, onValueChange = onAudioCrossfaderChange,
+                      colors = SliderDefaults.colors(thumbColor = Neon.CYAN,
+                          activeTrackColor = Neon.CYAN.copy(alpha = 0.7f),
+                          inactiveTrackColor = Neon.MAGENTA.copy(alpha = 0.7f)),
+                      modifier = Modifier.fillMaxWidth().height(18.dp))
+                  Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                      Text("CUT", color = if (crossMode == CrossfaderMode.CUT) Neon.CYAN else Neon.TEXT_DIM,
+                          fontSize = 8.sp, fontWeight = FontWeight.Bold,
+                          modifier = Modifier.clickable { onCrossModeChange(CrossfaderMode.CUT) }.padding(horizontal = 4.dp, vertical = 2.dp))
+                      Text("|", color = Neon.TEXT_DIM, fontSize = 8.sp)
+                      Text("FADE", color = if (crossMode == CrossfaderMode.FADE) Neon.CYAN else Neon.TEXT_DIM,
+                          fontSize = 8.sp, fontWeight = FontWeight.Bold,
+                          modifier = Modifier.clickable { onCrossModeChange(CrossfaderMode.FADE) }.padding(horizontal = 4.dp, vertical = 2.dp))
+                  }
+              }
+          }
 
-                  Box(modifier = Modifier.fillMaxWidth().weight(1f)
-                      .clip(RoundedCornerShape(12.dp)).background(Color.Black)
-                      .border(2.dp, Neon.CYAN.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
-                  ) {
-                      VideoDeckView(
-                          deck = deck0, alpha = 1f, transition = transition,
-                          accentColor = Neon.CYAN, showScratchOverlay = true,
-                          modifier = Modifier.fillMaxSize()
-                      )
-                      VideoDeckView(
-                          deck = deck1, alpha = 1f - crossfaderValue, transition = transition,
-                          accentColor = Neon.MAGENTA, showScratchOverlay = true,
-                          modifier = Modifier.fillMaxSize()
-                      )
-
-                      Row(modifier = Modifier.align(Alignment.BottomStart).padding(6.dp),
-                          horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                          DeckLiveBadge("D1", deck0.isPlaying, deck0.scratching, Neon.CYAN)
-                          DeckLiveBadge("D2", deck1.isPlaying, deck1.scratching, Neon.MAGENTA)
+          @Composable
+          private fun SamplerDrawer(onPlayTone: (Int) -> Unit) {
+              val pads = listOf(
+                  "KICK" to ToneGenerator.TONE_DTMF_1, "SNARE" to ToneGenerator.TONE_DTMF_2,
+                  "HIHAT" to ToneGenerator.TONE_DTMF_3, "CLAP" to ToneGenerator.TONE_DTMF_4,
+                  "PERC" to ToneGenerator.TONE_PROP_BEEP, "RISER" to ToneGenerator.TONE_PROP_BEEP2,
+                  "LASER" to ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, "SIREN" to ToneGenerator.TONE_CDMA_EMERGENCY_RINGBACK)
+              Row(modifier = Modifier.fillMaxWidth().height(80.dp)
+                  .clip(RoundedCornerShape(10.dp)).background(Neon.PANEL_DARK)
+                  .border(1.dp, Neon.MAGENTA.copy(alpha = 0.5f), RoundedCornerShape(10.dp)).padding(6.dp),
+                  horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                  pads.forEachIndexed { i, (name, tone) ->
+                      val accent = if (i % 2 == 0) Neon.MAGENTA else Neon.PURPLE
+                      Box(modifier = Modifier.weight(1f).fillMaxHeight()
+                          .clip(RoundedCornerShape(8.dp)).background(accent.copy(alpha = 0.15f))
+                          .border(1.dp, accent.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                          .clickable { onPlayTone(tone) }, contentAlignment = Alignment.Center) {
+                          Text(name, color = accent, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                       }
                   }
+              }
+          }
 
-                  Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                      Slider(value = crossfaderValue, onValueChange = onCrossfaderChange,
-                          colors = SliderDefaults.colors(
-                              thumbColor = Neon.CYAN, activeTrackColor = Neon.CYAN,
-                              inactiveTrackColor = Neon.MAGENTA.copy(alpha = 0.6f)
-                          ), modifier = Modifier.fillMaxWidth())
-                      Text("CROSSFADER", color = Neon.TEXT_DIM, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
+          @Composable
+          private fun FxDrawer(engine: AudioEngine, deckA: Int) {
+              var echoOn by remember { mutableStateOf(false) }
+              var filterOn by remember { mutableStateOf(false) }
+              Row(modifier = Modifier.fillMaxWidth().height(80.dp)
+                  .clip(RoundedCornerShape(10.dp)).background(Neon.PANEL_DARK)
+                  .border(1.dp, Neon.PURPLE.copy(alpha = 0.5f), RoundedCornerShape(10.dp)).padding(6.dp),
+                  horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                  FxPad("ECHO", Neon.CYAN, echoOn, { echoOn = !echoOn; engine.setEcho(echoOn) }, Modifier.weight(1f))
+                  FxPad("FILTER", Neon.MAGENTA, filterOn, { filterOn = !filterOn; engine.setFilter(filterOn) }, Modifier.weight(1f))
+                  FxPad("ROLL", Neon.LIME, false, { engine.toggleLoop(deckA, 1) }, Modifier.weight(1f))
+                  FxPad("BRAKE", Neon.RED, false, { engine.brake(deckA) }, Modifier.weight(1f))
+                  FxPad("SPIN", Neon.ORANGE, false, { engine.spinback(deckA) }, Modifier.weight(1f))
+                  FxPad("VOCAL", Neon.PURPLE, false, { engine.setVocalRemoval(true) }, Modifier.weight(1f))
+              }
+          }
+
+          @Composable
+          private fun FxPad(label: String, accent: Color, active: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+              Box(modifier = modifier.fillMaxHeight()
+                  .clip(RoundedCornerShape(8.dp))
+                  .background(if (active) accent.copy(alpha = 0.35f) else accent.copy(alpha = 0.12f))
+                  .border(if (active) 2.dp else 1.dp, accent.copy(alpha = if (active) 1f else 0.55f), RoundedCornerShape(8.dp))
+                  .clickable { onClick() }, contentAlignment = Alignment.Center) {
+                  Text(label, color = accent, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+              }
+          }
+
+          @Composable
+          private fun LibraryDrawer(onPickForA: () -> Unit, onPickForB: () -> Unit, onLoadSampleA: () -> Unit, onLoadSampleB: () -> Unit) {
+              Row(modifier = Modifier.fillMaxWidth().height(80.dp)
+                  .clip(RoundedCornerShape(10.dp)).background(Neon.PANEL_DARK)
+                  .border(1.dp, Neon.CYAN.copy(alpha = 0.5f), RoundedCornerShape(10.dp)).padding(6.dp),
+                  horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                  LibBtn("FILE \u2192 A", Neon.CYAN, onPickForA, Modifier.weight(1f))
+                  LibBtn("FILE \u2192 B", Neon.MAGENTA, onPickForB, Modifier.weight(1f))
+                  LibBtn("SAMPLE A", Neon.LIME, onLoadSampleA, Modifier.weight(1f))
+                  LibBtn("SAMPLE B", Neon.ORANGE, onLoadSampleB, Modifier.weight(1f))
+              }
+          }
+
+          @Composable
+          private fun LibBtn(label: String, accent: Color, onClick: () -> Unit, modifier: Modifier = Modifier) {
+              Box(modifier = modifier.fillMaxHeight()
+                  .clip(RoundedCornerShape(8.dp)).background(accent.copy(alpha = 0.15f))
+                  .border(1.dp, accent.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                  .clickable { onClick() }, contentAlignment = Alignment.Center) {
+                  Text(label, color = accent, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+              }
+          }
+
+          @Composable
+          private fun BottomBar(activePanel: BottomPanel, onTogglePanel: (BottomPanel) -> Unit,
+                                activeDeckA: Int, activeDeckB: Int,
+                                onSwapA: (Int) -> Unit, onSwapB: (Int) -> Unit, onLoadSample: (Int) -> Unit) {
+              Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                  BarBtn("\u2630 LIB", Neon.CYAN, activePanel == BottomPanel.LIBRARY) { onTogglePanel(BottomPanel.LIBRARY) }
+                  BarBtn("SAMPLER", Neon.MAGENTA, activePanel == BottomPanel.SAMPLER) { onTogglePanel(BottomPanel.SAMPLER) }
+                  Spacer(Modifier.weight(1f))
+                  for (id in 2..5) {
+                      val isA = id == activeDeckA; val isB = id == activeDeckB
+                      val active = isA || isB
+                      val col = if (active) Neon.DECK_COLORS[id] else Neon.TEXT_DIM
+                      Box(modifier = Modifier.clip(RoundedCornerShape(6.dp))
+                          .background(if (active) Neon.DECK_COLORS[id].copy(alpha = 0.25f) else Neon.BTN_BG)
+                          .border(1.dp, col.copy(alpha = if (active) 1f else 0.4f), RoundedCornerShape(6.dp))
+                          .clickable { if (isA) onSwapA(0) else if (isB) onSwapB(1) else { onSwapA(id); onLoadSample(id) } }
+                          .padding(horizontal = 6.dp, vertical = 6.dp), contentAlignment = Alignment.Center) {
+                          Text("D${id + 1}", color = col, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                      }
                   }
-
-                  Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(4.dp)) {
-                      FxChip("ECHO", Neon.CYAN, echoOn, onEchoToggle, Modifier.weight(1f))
-                      FxChip("FILTER", Neon.MAGENTA, filterOn, onFilterToggle, Modifier.weight(1f))
-                      FxChip("FLANGE", Neon.PURPLE, flangeOn, onFlangeToggle, Modifier.weight(1f))
-                      FxChip("REVERB", Neon.PURPLE, reverbOn, onReverbToggle, Modifier.weight(1f))
-                  }
-                  Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(4.dp)) {
-                      FxChip("\u25CF REC", Neon.RED, recOn, onRecToggle, Modifier.weight(1f))
-                      FxChip("VOCAL OFF", Neon.PURPLE, vocalOff, onVocalToggle, Modifier.weight(1f))
-                      FxChip("MASTER", Neon.YELLOW, true, {}, Modifier.weight(1f))
-                  }
+                  Spacer(Modifier.weight(1f))
+                  BarBtn("FX", Neon.PURPLE, activePanel == BottomPanel.FX) { onTogglePanel(BottomPanel.FX) }
+                  BarBtn("SET", Neon.CYAN, false) { }
               }
           }
 
           @Composable
-          private fun DeckLiveBadge(label: String, playing: Boolean, scratching: Boolean, accent: Color) {
-              val bg = when {
-                  scratching -> Neon.YELLOW
-                  playing -> accent
-                  else -> Color(0xFF1A1A24)
-              }
-              val fg = when {
-                  scratching || playing -> Color.Black
-                  else -> accent.copy(alpha = 0.5f)
-              }
-              Box(modifier = Modifier.clip(RoundedCornerShape(50)).background(bg.copy(alpha = 0.85f))
-                  .padding(horizontal = 8.dp, vertical = 3.dp)
-              ) {
-                  Text(
-                      text = when {
-                          scratching -> "$label SCRATCH"
-                          playing -> "$label LIVE"
-                          else -> "$label IDLE"
-                      },
-                      color = fg, fontSize = 8.sp, fontWeight = FontWeight.Bold
-                  )
+          private fun BarBtn(label: String, accent: Color, active: Boolean, onClick: () -> Unit) {
+              Box(modifier = Modifier.clip(RoundedCornerShape(8.dp))
+                  .background(if (active) accent.copy(alpha = 0.35f) else Neon.BTN_BG)
+                  .border(1.dp, accent.copy(alpha = if (active) 1f else 0.5f), RoundedCornerShape(8.dp))
+                  .clickable { onClick() }.padding(horizontal = 8.dp, vertical = 7.dp), contentAlignment = Alignment.Center) {
+                  Text(label, color = accent, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
               }
           }
 
           @Composable
-          private fun StemButton(label: String, accent: Color, onClick: () -> Unit, modifier: Modifier = Modifier) {
-              Box(modifier = modifier.clip(RoundedCornerShape(8.dp)).background(Neon.BTN_BG)
-                  .border(1.dp, accent.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
-                  .clickable { onClick() }.padding(vertical = 6.dp), contentAlignment = Alignment.Center
-              ) { Text(label, color = accent.copy(alpha = 0.85f), fontSize = 9.sp, fontWeight = FontWeight.Bold) }
-          }
-
-          @Composable
-          private fun TransportBtn(label: String, accent: Color, onClick: () -> Unit, modifier: Modifier = Modifier) {
-              Box(modifier = modifier.clip(RoundedCornerShape(8.dp)).background(Neon.BTN_BG)
-                  .border(1.dp, accent.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
-                  .clickable { onClick() }.padding(vertical = 6.dp), contentAlignment = Alignment.Center
-              ) { Text(label, color = accent, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
-          }
-
-          @Composable
-          private fun FxChip(label: String, accent: Color, active: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+          private fun PillBtn(label: String, accent: Color, active: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
               Box(modifier = modifier.clip(RoundedCornerShape(50))
-                  .background(if (active) accent.copy(alpha = 0.35f) else accent.copy(alpha = 0.10f))
-                  .border(
-                      width = if (active) 2.dp else 1.dp,
-                      color = accent.copy(alpha = if (active) 1f else 0.55f),
-                      shape = RoundedCornerShape(50)
-                  )
-                  .clickable { onClick() }.padding(vertical = 8.dp), contentAlignment = Alignment.Center
-              ) { Text(label, color = accent, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp) }
+                  .background(if (active) accent else Neon.BTN_BG)
+                  .border(1.dp, accent.copy(alpha = if (active) 1f else 0.55f), RoundedCornerShape(50))
+                  .clickable { onClick() }.padding(vertical = 6.dp), contentAlignment = Alignment.Center) {
+                  Text(label, color = if (active) Color.Black else accent, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+              }
           }
 
           private fun fmt(ms: Long): String {
@@ -2063,7 +1805,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Fix: capture Activity ref before setContent (BoxScope vs Activity)" || echo "nothing to commit"
+          git commit -m "v5.0 complete: Cross DJ layout, platter scratch, REC, stems, loops, cues, FX, sampler, library" || echo "nothing"
           git push
 
       - name: Set up JDK 17
@@ -2078,6 +1820,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: DJProMixer-v21-debug
+          name: DJProMixer-v50-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: warn
