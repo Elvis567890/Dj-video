@@ -11,28 +11,17 @@ import androidx.compose.ui.Modifier
 import com.djpro.mixer.audio.AudioEngine
 
 class MainActivity : ComponentActivity() {
-
     private lateinit var engine: AudioEngine
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         engine = AudioEngine(this)
-
         setContent {
             MaterialTheme {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Neon.BG)
-                ) {
-                    SixDeckScreen(engine)
+                Box(modifier = Modifier.fillMaxSize().background(Neon.BG)) {
+                    SixDeckScreen(engine, this)
                 }
             }
         }
     }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        engine.release()
-    }
+    override fun onDestroy() { super.onDestroy(); engine.release() }
 }

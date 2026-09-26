@@ -8,7 +8,6 @@ import java.nio.ByteBuffer
 class EchoAudioProcessor : BaseAudioProcessor() {
     @Volatile var enabled: Boolean = false
     @Volatile var mix: Float = 0.35f
-
     private var delayBuffer = ShortArray(0)
     private var writePos = 0
 

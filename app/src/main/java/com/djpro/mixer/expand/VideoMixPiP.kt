@@ -9,11 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,28 +27,20 @@ import kotlin.math.roundToInt
 fun VideoMixPiP(modifier: Modifier = Modifier) {
     var dx by remember { mutableStateOf(0f) }
     var dy by remember { mutableStateOf(0f) }
-
     Box(
         modifier = modifier
             .offset { IntOffset(dx.roundToInt(), dy.roundToInt()) }
-            .size(width = 160.dp, height = 90.dp)
+            .size(180.dp, 100.dp)
             .clip(RoundedCornerShape(10.dp))
             .background(Color.Black)
-            .border(1.dp, Neon.CYAN.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+            .border(1.5.dp, Neon.CYAN.copy(alpha = 0.7f), RoundedCornerShape(10.dp))
             .pointerInput(Unit) {
                 detectDragGestures { change: PointerInputChange, drag: Offset ->
-                    change.consume()
-                    dx += drag.x
-                    dy += drag.y
+                    change.consume(); dx += drag.x; dy += drag.y
                 }
             },
         contentAlignment = Alignment.BottomStart
     ) {
-        Text(
-            text = "VIDEO MIX",
-            color = Neon.CYAN.copy(alpha = 0.7f),
-            fontSize = 9.sp,
-            modifier = Modifier.padding(6.dp)
-        )
+        Text("VIDEO MIX", color = Neon.CYAN.copy(alpha = 0.8f), fontSize = 9.sp, modifier = Modifier.padding(6.dp))
     }
 }

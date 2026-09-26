@@ -7,6 +7,7 @@ import java.nio.ByteBuffer
 
 class FilterAudioProcessor : BaseAudioProcessor() {
     @Volatile var enabled: Boolean = false
+    @Volatile var depth: Float = 0.15f
     private var prev = FloatArray(2)
 
     override fun onConfigure(inputFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
@@ -21,11 +22,12 @@ class FilterAudioProcessor : BaseAudioProcessor() {
         val out = replaceOutputBuffer(inputBuffer.remaining())
         val ch = prev.size
         var i = 0
+        val a = depth.coerceIn(0.01f, 1f)
         while (inputBuffer.remaining() >= 2) {
             val s = inputBuffer.short.toFloat() / 32768f
             val c = i % ch
             val filtered = if (enabled) {
-                val y = 0.15f * s + 0.85f * prev[c]
+                val y = a * s + (1 - a) * prev[c]
                 prev[c] = y
                 y
             } else s

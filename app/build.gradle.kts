@@ -11,15 +11,11 @@ android {
         applicationId = "com.djpro.mixer"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 6
+        versionName = "2.1.0"
     }
 
-    buildTypes {
-        release {
-            isMinifyEnabled = false
-        }
-    }
+    buildTypes { release { isMinifyEnabled = false } }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -31,13 +27,8 @@ android {
         freeCompilerArgs += listOf("-Xjvm-default=all")
     }
 
-    buildFeatures {
-        compose = true
-    }
-
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.14"
-    }
+    buildFeatures { compose = true }
+    composeOptions { kotlinCompilerExtensionVersion = "1.5.14" }
 
     packaging {
         resources {
@@ -48,10 +39,7 @@ android {
         }
     }
 
-    lint {
-        abortOnError = false
-        checkReleaseBuilds = false
-    }
+    lint { abortOnError = false; checkReleaseBuilds = false }
 }
 
 dependencies {

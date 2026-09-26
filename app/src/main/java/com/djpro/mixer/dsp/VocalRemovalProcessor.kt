@@ -33,7 +33,6 @@ class VocalRemovalProcessor : BaseAudioProcessor() {
         }
         out.flip()
     }
-
     override fun onFlush() {}
     override fun onReset() {}
 }
