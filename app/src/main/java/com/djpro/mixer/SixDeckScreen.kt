@@ -1,9 +1,6 @@
 package com.djpro.mixer
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -41,7 +38,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.djpro.mixer.audio.AudioEngine
-import com.djpro.mixer.expand.DeckAnim
 import com.djpro.mixer.expand.ExpandableDeckManager
 import com.djpro.mixer.expand.VideoDeckView
 import com.djpro.mixer.expand.VideoMixPiP
@@ -124,7 +120,6 @@ fun SixDeckScreen(engine: AudioEngine) {
                     )
                 }
 
-                // Center panel: shown when video is NOT fullscreen
                 if (!layout.videoFullscreen) {
                     Box(
                         modifier = Modifier
@@ -160,15 +155,13 @@ fun SixDeckScreen(engine: AudioEngine) {
                 }
             }
 
-            AnimatedVisibility(
-                visible = layout.expandedDeckId != null && (layout.expandedDeckId ?: 0) > 1,
-                enter = DeckAnim.pipEnter,
-                exit = DeckAnim.pipExit,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 4.dp)
-            ) {
-                VideoMixPiP()
+            // PiP video when a mini deck is expanded — plain if, no scope conflict
+            if (layout.expandedDeckId != null && (layout.expandedDeckId ?: 0) > 1) {
+                VideoMixPiP(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 4.dp)
+                )
             }
         }
 
