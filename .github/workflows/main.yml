@@ -225,7 +225,7 @@ jobs:
           </resources>
           EOF
 
-      # ============ DSP LAYER ============
+      # ============ DSP ============
 
       - name: EchoAudioProcessor.kt
         run: |
@@ -365,7 +365,7 @@ jobs:
           }
           EOF
 
-      # ============ AUDIO LAYER ============
+      # ============ AUDIO ============
 
       - name: DeckPlayer.kt
         run: |
@@ -525,7 +525,7 @@ jobs:
           }
           EOF
 
-      # ============ VIDEO / RECORDING ============
+      # ============ VIDEO ============
 
       - name: RecordingService.kt
         run: |
@@ -672,7 +672,7 @@ jobs:
           }
           EOF
 
-      # ============ UI LAYER ============
+      # ============ UI ============
 
       - name: NeonTheme.kt
         run: |
@@ -1053,35 +1053,39 @@ jobs:
                               )
                           }
 
-                          AnimatedVisibility(
-                              visible = !layout.videoFullscreen,
-                              enter = fadeIn(),
-                              exit = fadeOut(),
-                              modifier = Modifier.weight(1.4f).fillMaxHeight()
-                          ) {
-                              CenterVideoPanel(
-                                  engine = engine,
-                                  crossfaderValue = crossfaderValue,
-                                  onCrossfaderChange = {
-                                      crossfaderValue = it
-                                      engine.setCrossfader(it)
-                                  },
-                                  echoOn = echoOn,
-                                  filterOn = filterOn,
-                                  vocalOff = vocalOff,
-                                  onEchoToggle = {
-                                      echoOn = !echoOn
-                                      engine.setEcho(echoOn)
-                                  },
-                                  onFilterToggle = {
-                                      filterOn = !filterOn
-                                      engine.setFilter(filterOn)
-                                  },
-                                  onVocalToggle = {
-                                      vocalOff = !vocalOff
-                                      engine.setVocalRemoval(vocalOff)
-                                  }
-                              )
+                          // Center panel: shown when video is NOT fullscreen
+                          if (!layout.videoFullscreen) {
+                              Box(
+                                  modifier = Modifier
+                                      .weight(1.4f)
+                                      .fillMaxHeight()
+                              ) {
+                                  CenterVideoPanel(
+                                      engine = engine,
+                                      crossfaderValue = crossfaderValue,
+                                      onCrossfaderChange = {
+                                          crossfaderValue = it
+                                          engine.setCrossfader(it)
+                                      },
+                                      echoOn = echoOn,
+                                      filterOn = filterOn,
+                                      vocalOff = vocalOff,
+                                      onEchoToggle = {
+                                          echoOn = !echoOn
+                                          engine.setEcho(echoOn)
+                                      },
+                                      onFilterToggle = {
+                                          filterOn = !filterOn
+                                          engine.setFilter(filterOn)
+                                      },
+                                      onVocalToggle = {
+                                          vocalOff = !vocalOff
+                                          engine.setVocalRemoval(vocalOff)
+                                      }
+                                  )
+                              }
+                          } else {
+                              Spacer(Modifier.weight(1.4f))
                           }
                       }
 
@@ -1251,7 +1255,6 @@ jobs:
                       .padding(10.dp),
                   verticalArrangement = Arrangement.spacedBy(8.dp)
               ) {
-                  // Real video mixing: two PlayerViews stacked, alpha driven by crossfader
                   Box(
                       modifier = Modifier
                           .fillMaxWidth()
@@ -1404,7 +1407,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "All features: DSP + video mix + recording service + expandable decks" || echo "nothing to commit"
+          git commit -m "Fix AnimatedVisibility scope conflict in SixDeckScreen" || echo "nothing to commit"
           git push
 
       - name: Set up JDK 17
