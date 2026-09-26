@@ -225,8 +225,6 @@ jobs:
           </resources>
           EOF
 
-      # ============ DSP ============
-
       - name: EchoAudioProcessor.kt
         run: |
           cat > app/src/main/java/com/djpro/mixer/dsp/EchoAudioProcessor.kt << 'EOF'
@@ -364,8 +362,6 @@ jobs:
               override fun onReset() {}
           }
           EOF
-
-      # ============ AUDIO ============
 
       - name: DeckPlayer.kt
         run: |
@@ -525,8 +521,6 @@ jobs:
           }
           EOF
 
-      # ============ VIDEO ============
-
       - name: RecordingService.kt
         run: |
           cat > app/src/main/java/com/djpro/mixer/video/RecordingService.kt << 'EOF'
@@ -672,8 +666,6 @@ jobs:
           }
           EOF
 
-      # ============ UI ============
-
       - name: NeonTheme.kt
         run: |
           cat > app/src/main/java/com/djpro/mixer/NeonTheme.kt << 'EOF'
@@ -762,28 +754,6 @@ jobs:
 
               fun crossfaderLabel(): String =
                   "DECK ${state.crossfaderA + 1}  \u2194  DECK ${state.crossfaderB + 1}"
-          }
-          EOF
-
-      - name: DeckAnimationSpecs.kt
-        run: |
-          cat > app/src/main/java/com/djpro/mixer/expand/DeckAnimationSpecs.kt << 'EOF'
-          package com.djpro.mixer.expand
-
-          import androidx.compose.animation.EnterTransition
-          import androidx.compose.animation.ExitTransition
-          import androidx.compose.animation.core.tween
-          import androidx.compose.animation.fadeIn
-          import androidx.compose.animation.fadeOut
-          import androidx.compose.animation.scaleIn
-          import androidx.compose.animation.scaleOut
-
-          object DeckAnim {
-              val fade = tween<Float>(durationMillis = 220)
-              val pipEnter: EnterTransition =
-                  fadeIn(fade) + scaleIn(initialScale = 0.6f)
-              val pipExit: ExitTransition =
-                  fadeOut(fade) + scaleOut(targetScale = 0.6f)
           }
           EOF
 
@@ -929,10 +899,7 @@ jobs:
           cat > app/src/main/java/com/djpro/mixer/SixDeckScreen.kt << 'EOF'
           package com.djpro.mixer
 
-          import androidx.compose.animation.AnimatedVisibility
           import androidx.compose.animation.core.animateFloatAsState
-          import androidx.compose.animation.fadeIn
-          import androidx.compose.animation.fadeOut
           import androidx.compose.foundation.background
           import androidx.compose.foundation.border
           import androidx.compose.foundation.clickable
@@ -970,7 +937,6 @@ jobs:
           import androidx.compose.ui.unit.dp
           import androidx.compose.ui.unit.sp
           import com.djpro.mixer.audio.AudioEngine
-          import com.djpro.mixer.expand.DeckAnim
           import com.djpro.mixer.expand.ExpandableDeckManager
           import com.djpro.mixer.expand.VideoDeckView
           import com.djpro.mixer.expand.VideoMixPiP
@@ -1053,7 +1019,6 @@ jobs:
                               )
                           }
 
-                          // Center panel: shown when video is NOT fullscreen
                           if (!layout.videoFullscreen) {
                               Box(
                                   modifier = Modifier
@@ -1089,15 +1054,13 @@ jobs:
                           }
                       }
 
-                      AnimatedVisibility(
-                          visible = layout.expandedDeckId != null && (layout.expandedDeckId ?: 0) > 1,
-                          enter = DeckAnim.pipEnter,
-                          exit = DeckAnim.pipExit,
-                          modifier = Modifier
-                              .align(Alignment.TopEnd)
-                              .padding(top = 4.dp)
-                      ) {
-                          VideoMixPiP()
+                      // PiP video when a mini deck is expanded — plain if, no scope conflict
+                      if (layout.expandedDeckId != null && (layout.expandedDeckId ?: 0) > 1) {
+                          VideoMixPiP(
+                              modifier = Modifier
+                                  .align(Alignment.TopEnd)
+                                  .padding(top = 4.dp)
+                          )
                       }
                   }
 
@@ -1407,7 +1370,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Fix AnimatedVisibility scope conflict in SixDeckScreen" || echo "nothing to commit"
+          git commit -m "Replace PiP AnimatedVisibility with plain if (scope fix)" || echo "nothing to commit"
           git push
 
       - name: Set up JDK 17
