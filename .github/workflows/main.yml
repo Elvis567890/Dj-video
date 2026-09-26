@@ -473,7 +473,6 @@ jobs:
                       volume = 1f
                   }
 
-              // Observable Compose state
               var isLoaded by mutableStateOf(false); private set
               var isPlaying by mutableStateOf(false); private set
               var scratching by mutableStateOf(false); private set
@@ -1107,8 +1106,6 @@ jobs:
           }
           EOF
 
-      # ==================== SCRATCH OVERLAY ====================
-
       - name: ScratchOverlay.kt
         run: |
           cat > app/src/main/java/com/djpro/mixer/ui/ScratchOverlay.kt << 'EOF'
@@ -1134,6 +1131,7 @@ jobs:
           import androidx.compose.ui.Modifier
           import androidx.compose.ui.draw.clip
           import androidx.compose.ui.geometry.Offset
+          import androidx.compose.ui.geometry.Size
           import androidx.compose.ui.graphics.Color
           import androidx.compose.ui.text.font.FontWeight
           import androidx.compose.ui.unit.dp
@@ -1142,14 +1140,6 @@ jobs:
           import kotlin.math.abs
           import kotlin.random.Random
 
-          /**
-           * Visual overlay shown when a deck is being scratched.
-           * Renders:
-           *  - animated glitch bars
-           *  - speed/rate badge ("SCRATCH ×1.4")
-           *  - corner neon brackets
-           *  - scanning line based on scratch velocity
-           */
           @Composable
           fun ScratchOverlay(
               accent: Color,
@@ -1165,13 +1155,11 @@ jobs:
               )
 
               Box(modifier = modifier.fillMaxSize()) {
-                  // Glitch bars canvas
                   Canvas(modifier = Modifier.fillMaxSize()) {
                       val w = size.width
                       val h = size.height
                       val intensity = (abs(velocity) * 1.2f).coerceIn(0f, 1.5f)
 
-                      // Random horizontal slices
                       val rnd = Random((phase.toInt() * 7919))
                       val sliceCount = (10 + (intensity * 20)).toInt()
                       for (i in 0 until sliceCount) {
@@ -1183,11 +1171,10 @@ jobs:
                               color = if (rnd.nextBoolean()) accent.copy(alpha = alpha)
                                       else Neon.MAGENTA.copy(alpha = alpha),
                               topLeft = Offset(xOff, y),
-                              size = androidx.compose.ui.geometry.Size(w, sliceH)
+                              size = Size(w, sliceH)
                           )
                       }
 
-                      // Horizontal scan line sweeping based on velocity direction
                       val scanY = ((phase * 2f * (if (velocity >= 0) 1f else -1f)) % h + h) % h
                       drawLine(
                           color = accent.copy(alpha = 0.7f),
@@ -1196,17 +1183,14 @@ jobs:
                           strokeWidth = 2f
                       )
 
-                      // Vignette glow when scratching
                       val glowAlpha = 0.25f + 0.35f * intensity
                       drawRect(color = accent.copy(alpha = glowAlpha * 0.15f))
                   }
 
-                  // Corner brackets (Top-left)
                   CornerBrackets(accent)
 
-                  // Rate badge (top-center)
-                  val displayRate = if (rate < 0f) "REV ×${"%.2f".format(abs(rate))}"
-                                    else "×${"%.2f".format(rate)}"
+                  val displayRate = if (rate < 0f) "REV \u00D7${"%.2f".format(abs(rate))}"
+                                    else "\u00D7${"%.2f".format(rate)}"
                   Box(
                       modifier = Modifier
                           .align(Alignment.TopCenter)
@@ -1233,16 +1217,12 @@ jobs:
                   val h = size.height
                   val arm = 24f
                   val thick = 3f
-                  // TL
                   drawLine(accent, Offset(0f, 0f), Offset(arm, 0f), thick)
                   drawLine(accent, Offset(0f, 0f), Offset(0f, arm), thick)
-                  // TR
                   drawLine(accent, Offset(w, 0f), Offset(w - arm, 0f), thick)
                   drawLine(accent, Offset(w, 0f), Offset(w, arm), thick)
-                  // BL
                   drawLine(accent, Offset(0f, h), Offset(arm, h), thick)
                   drawLine(accent, Offset(0f, h), Offset(0f, h - arm), thick)
-                  // BR
                   drawLine(accent, Offset(w, h), Offset(w - arm, h), thick)
                   drawLine(accent, Offset(w, h), Offset(w, h - arm), thick)
               }
@@ -1307,11 +1287,13 @@ jobs:
           import androidx.compose.ui.Alignment
           import androidx.compose.ui.Modifier
           import androidx.compose.ui.draw.clipToBounds
+          import androidx.compose.ui.graphics.Color
           import androidx.compose.ui.graphics.graphicsLayer
           import androidx.compose.ui.viewinterop.AndroidView
           import androidx.media3.ui.PlayerView
           import com.djpro.mixer.audio.DeckPlayer
           import com.djpro.mixer.ui.ScratchOverlay
+          import kotlin.math.abs
           import kotlin.random.Random
 
           enum class VideoTransition { CROSSFADE, ZOOM, WIPE }
@@ -1321,7 +1303,7 @@ jobs:
               deck: DeckPlayer,
               alpha: Float,
               transition: VideoTransition = VideoTransition.CROSSFADE,
-              accentColor: androidx.compose.ui.graphics.Color,
+              accentColor: Color,
               showScratchOverlay: Boolean = true,
               modifier: Modifier = Modifier
           ) {
@@ -1335,19 +1317,17 @@ jobs:
                   tween(220), label = "wipe"
               )
 
-              // Live scratch state
               val scratching = deck.scratching
               val scratchVelocity = deck.scratchVelocity
               val scratchRate = deck.scratchRate
 
-              // Jitter offsets when scratching
               val jitterX: Float
               val jitterY: Float
               val stretchX: Float
               if (scratching) {
                   val rnd = remember(scratchVelocity) { Random((scratchVelocity * 1000).toInt()) }
-                  jitterX = (rnd.nextFloat() - 0.5f) * 30f * (kotlin.math.abs(scratchVelocity) + 0.3f)
-                  jitterY = (rnd.nextFloat() - 0.5f) * 10f * (kotlin.math.abs(scratchVelocity) + 0.3f)
+                  jitterX = (rnd.nextFloat() - 0.5f) * 30f * (abs(scratchVelocity) + 0.3f)
+                  jitterY = (rnd.nextFloat() - 0.5f) * 10f * (abs(scratchVelocity) + 0.3f)
                   stretchX = 1f + (scratchVelocity * 0.05f).coerceIn(-0.08f, 0.08f)
               } else {
                   jitterX = 0f; jitterY = 0f; stretchX = 1f
@@ -1373,7 +1353,6 @@ jobs:
                       }
                   )
 
-                  // Scratch visual feedback drawn on top of this deck's video
                   if (showScratchOverlay && scratching && alpha > 0.3f) {
                       ScratchOverlay(
                           accent = accentColor,
@@ -1381,7 +1360,7 @@ jobs:
                           velocity = scratchVelocity,
                           modifier = Modifier
                               .fillMaxSize()
-                              .graphicsLayer { this.alpha = (alpha * 1f).coerceIn(0f, 1f) }
+                              .graphicsLayer { this.alpha = alpha.coerceIn(0f, 1f) }
                       )
                   }
               }
@@ -1439,6 +1418,8 @@ jobs:
           }
           EOF
 
+      # ==================== MAIN ====================
+
       - name: MainActivity.kt
         run: |
           cat > app/src/main/java/com/djpro/mixer/MainActivity.kt << 'EOF'
@@ -1459,10 +1440,11 @@ jobs:
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
                   engine = AudioEngine(this)
+                  val activityRef = this
                   setContent {
                       MaterialTheme {
                           Box(modifier = Modifier.fillMaxSize().background(Neon.BG)) {
-                              SixDeckScreen(engine, this)
+                              SixDeckScreen(engine, activityRef)
                           }
                       }
                   }
@@ -1946,7 +1928,6 @@ jobs:
                       }
                   }
 
-                  // Video area — each deck passes its own scratch state
                   Box(modifier = Modifier.fillMaxWidth().weight(1f)
                       .clip(RoundedCornerShape(12.dp)).background(Color.Black)
                       .border(2.dp, Neon.CYAN.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
@@ -1962,7 +1943,6 @@ jobs:
                           modifier = Modifier.fillMaxSize()
                       )
 
-                      // LIVE badges per deck
                       Row(modifier = Modifier.align(Alignment.BottomStart).padding(6.dp),
                           horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                           DeckLiveBadge("D1", deck0.isPlaying, deck0.scratching, Neon.CYAN)
@@ -2083,7 +2063,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "v2.1: video mixer reacts to scratch with glitch overlay + LIVE badges" || echo "nothing to commit"
+          git commit -m "Fix: capture Activity ref before setContent (BoxScope vs Activity)" || echo "nothing to commit"
           git push
 
       - name: Set up JDK 17
