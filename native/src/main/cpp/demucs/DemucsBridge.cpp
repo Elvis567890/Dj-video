@@ -5,11 +5,11 @@
 
 extern "C" {
     JNIEXPORT jboolean JNICALL
-    Java_com_djpro_native_DemucsBridge_isModelReady(JNIEnv*, jobject) {
+    Java_com_djpro_nativecore_DemucsBridge_isModelReady(JNIEnv*, jobject) {
         return false;
     }
     JNIEXPORT jstring JNICALL
-    Java_com_djpro_native_DemucsBridge_separate(JNIEnv* env, jobject, jstring path) {
+    Java_com_djpro_nativecore_DemucsBridge_separate(JNIEnv* env, jobject, jstring path) {
         (void)path;
         return env->NewStringUTF("not_implemented");
     }

@@ -68,28 +68,28 @@ static OboeEngine* gEngine = nullptr;
 
 extern "C" {
     JNIEXPORT jboolean JNICALL
-    Java_com_djpro_native_NativeBridge_startEngine(JNIEnv*, jobject) {
+    Java_com_djpro_nativecore_NativeBridge_startEngine(JNIEnv*, jobject) {
         if (!gEngine) gEngine = new OboeEngine();
         return gEngine->start();
     }
     JNIEXPORT void JNICALL
-    Java_com_djpro_native_NativeBridge_stopEngine(JNIEnv*, jobject) {
+    Java_com_djpro_nativecore_NativeBridge_stopEngine(JNIEnv*, jobject) {
         if (gEngine) { gEngine->stop(); delete gEngine; gEngine = nullptr; }
     }
     JNIEXPORT void JNICALL
-    Java_com_djpro_native_NativeBridge_loadDeck(JNIEnv* env, jobject,
-                                                jint id, jfloatArray data, jfloat vol) {
+    Java_com_djpro_nativecore_NativeBridge_loadDeck(JNIEnv* env, jobject,
+                                                    jint id, jfloatArray data, jfloat vol) {
         jsize n = env->GetArrayLength(data);
         jfloat* buf = env->GetFloatArrayElements(data, nullptr);
         if (gEngine) gEngine->loadDeck(id, buf, n, vol);
         env->ReleaseFloatArrayElements(data, buf, 0);
     }
     JNIEXPORT void JNICALL
-    Java_com_djpro_native_NativeBridge_setDeckVolume(JNIEnv*, jobject, jint id, jfloat v) {
+    Java_com_djpro_nativecore_NativeBridge_setDeckVolume(JNIEnv*, jobject, jint id, jfloat v) {
         if (gEngine) gEngine->setDeckVolume(id, v);
     }
     JNIEXPORT void JNICALL
-    Java_com_djpro_native_NativeBridge_scratchDeck(JNIEnv*, jobject, jint id, jfloat rate) {
+    Java_com_djpro_nativecore_NativeBridge_scratchDeck(JNIEnv*, jobject, jint id, jfloat rate) {
         (void)id; (void)rate;
     }
 }

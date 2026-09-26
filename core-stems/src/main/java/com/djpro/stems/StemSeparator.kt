@@ -1,6 +1,6 @@
 package com.djpro.stems
 
-import com.djpro.native.DemucsBridge
+import com.djpro.nativecore.DemucsBridge
 import java.io.File
 
 class StemSeparator {

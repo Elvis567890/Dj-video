@@ -1,4 +1,4 @@
-package com.djpro.native
+package com.djpro.nativecore
 
 object NativeBridge {
     init { System.loadLibrary("djpro_native") }

@@ -1,7 +1,7 @@
 package com.djpro.audio
 
 import android.content.Context
-import com.djpro.native.NativeBridge
+import com.djpro.nativecore.NativeBridge
 import kotlin.math.cos
 import kotlin.math.sin
 
