@@ -15,10 +15,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         engine = AudioEngine(this)
+        val activityRef = this
         setContent {
             MaterialTheme {
                 Box(modifier = Modifier.fillMaxSize().background(Neon.BG)) {
-                    SixDeckScreen(engine, this)
+                    SixDeckScreen(engine, activityRef)
                 }
             }
         }

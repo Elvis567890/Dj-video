@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -28,14 +29,6 @@ import com.djpro.mixer.Neon
 import kotlin.math.abs
 import kotlin.random.Random
 
-/**
- * Visual overlay shown when a deck is being scratched.
- * Renders:
- *  - animated glitch bars
- *  - speed/rate badge ("SCRATCH ×1.4")
- *  - corner neon brackets
- *  - scanning line based on scratch velocity
- */
 @Composable
 fun ScratchOverlay(
     accent: Color,
@@ -51,13 +44,11 @@ fun ScratchOverlay(
     )
 
     Box(modifier = modifier.fillMaxSize()) {
-        // Glitch bars canvas
         Canvas(modifier = Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
             val intensity = (abs(velocity) * 1.2f).coerceIn(0f, 1.5f)
 
-            // Random horizontal slices
             val rnd = Random((phase.toInt() * 7919))
             val sliceCount = (10 + (intensity * 20)).toInt()
             for (i in 0 until sliceCount) {
@@ -69,11 +60,10 @@ fun ScratchOverlay(
                     color = if (rnd.nextBoolean()) accent.copy(alpha = alpha)
                             else Neon.MAGENTA.copy(alpha = alpha),
                     topLeft = Offset(xOff, y),
-                    size = androidx.compose.ui.geometry.Size(w, sliceH)
+                    size = Size(w, sliceH)
                 )
             }
 
-            // Horizontal scan line sweeping based on velocity direction
             val scanY = ((phase * 2f * (if (velocity >= 0) 1f else -1f)) % h + h) % h
             drawLine(
                 color = accent.copy(alpha = 0.7f),
@@ -82,17 +72,14 @@ fun ScratchOverlay(
                 strokeWidth = 2f
             )
 
-            // Vignette glow when scratching
             val glowAlpha = 0.25f + 0.35f * intensity
             drawRect(color = accent.copy(alpha = glowAlpha * 0.15f))
         }
 
-        // Corner brackets (Top-left)
         CornerBrackets(accent)
 
-        // Rate badge (top-center)
-        val displayRate = if (rate < 0f) "REV ×${"%.2f".format(abs(rate))}"
-                          else "×${"%.2f".format(rate)}"
+        val displayRate = if (rate < 0f) "REV \u00D7${"%.2f".format(abs(rate))}"
+                          else "\u00D7${"%.2f".format(rate)}"
         Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -119,16 +106,12 @@ private fun CornerBrackets(accent: Color) {
         val h = size.height
         val arm = 24f
         val thick = 3f
-        // TL
         drawLine(accent, Offset(0f, 0f), Offset(arm, 0f), thick)
         drawLine(accent, Offset(0f, 0f), Offset(0f, arm), thick)
-        // TR
         drawLine(accent, Offset(w, 0f), Offset(w - arm, 0f), thick)
         drawLine(accent, Offset(w, 0f), Offset(w, arm), thick)
-        // BL
         drawLine(accent, Offset(0f, h), Offset(arm, h), thick)
         drawLine(accent, Offset(0f, h), Offset(0f, h - arm), thick)
-        // BR
         drawLine(accent, Offset(w, h), Offset(w - arm, h), thick)
         drawLine(accent, Offset(w, h), Offset(w, h - arm), thick)
     }

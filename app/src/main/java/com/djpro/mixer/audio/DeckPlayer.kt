@@ -49,7 +49,6 @@ class DeckPlayer(val index: Int, context: Context) {
             volume = 1f
         }
 
-    // Observable Compose state
     var isLoaded by mutableStateOf(false); private set
     var isPlaying by mutableStateOf(false); private set
     var scratching by mutableStateOf(false); private set

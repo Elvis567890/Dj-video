@@ -10,11 +10,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.ui.PlayerView
 import com.djpro.mixer.audio.DeckPlayer
 import com.djpro.mixer.ui.ScratchOverlay
+import kotlin.math.abs
 import kotlin.random.Random
 
 enum class VideoTransition { CROSSFADE, ZOOM, WIPE }
@@ -24,7 +26,7 @@ fun VideoDeckView(
     deck: DeckPlayer,
     alpha: Float,
     transition: VideoTransition = VideoTransition.CROSSFADE,
-    accentColor: androidx.compose.ui.graphics.Color,
+    accentColor: Color,
     showScratchOverlay: Boolean = true,
     modifier: Modifier = Modifier
 ) {
@@ -38,19 +40,17 @@ fun VideoDeckView(
         tween(220), label = "wipe"
     )
 
-    // Live scratch state
     val scratching = deck.scratching
     val scratchVelocity = deck.scratchVelocity
     val scratchRate = deck.scratchRate
 
-    // Jitter offsets when scratching
     val jitterX: Float
     val jitterY: Float
     val stretchX: Float
     if (scratching) {
         val rnd = remember(scratchVelocity) { Random((scratchVelocity * 1000).toInt()) }
-        jitterX = (rnd.nextFloat() - 0.5f) * 30f * (kotlin.math.abs(scratchVelocity) + 0.3f)
-        jitterY = (rnd.nextFloat() - 0.5f) * 10f * (kotlin.math.abs(scratchVelocity) + 0.3f)
+        jitterX = (rnd.nextFloat() - 0.5f) * 30f * (abs(scratchVelocity) + 0.3f)
+        jitterY = (rnd.nextFloat() - 0.5f) * 10f * (abs(scratchVelocity) + 0.3f)
         stretchX = 1f + (scratchVelocity * 0.05f).coerceIn(-0.08f, 0.08f)
     } else {
         jitterX = 0f; jitterY = 0f; stretchX = 1f
@@ -76,7 +76,6 @@ fun VideoDeckView(
             }
         )
 
-        // Scratch visual feedback drawn on top of this deck's video
         if (showScratchOverlay && scratching && alpha > 0.3f) {
             ScratchOverlay(
                 accent = accentColor,
@@ -84,7 +83,7 @@ fun VideoDeckView(
                 velocity = scratchVelocity,
                 modifier = Modifier
                     .fillMaxSize()
-                    .graphicsLayer { this.alpha = (alpha * 1f).coerceIn(0f, 1f) }
+                    .graphicsLayer { this.alpha = alpha.coerceIn(0f, 1f) }
             )
         }
     }

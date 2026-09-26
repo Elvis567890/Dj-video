@@ -470,7 +470,6 @@ private fun CenterVideoPanel(
             }
         }
 
-        // Video area — each deck passes its own scratch state
         Box(modifier = Modifier.fillMaxWidth().weight(1f)
             .clip(RoundedCornerShape(12.dp)).background(Color.Black)
             .border(2.dp, Neon.CYAN.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
@@ -486,7 +485,6 @@ private fun CenterVideoPanel(
                 modifier = Modifier.fillMaxSize()
             )
 
-            // LIVE badges per deck
             Row(modifier = Modifier.align(Alignment.BottomStart).padding(6.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 DeckLiveBadge("D1", deck0.isPlaying, deck0.scratching, Neon.CYAN)
