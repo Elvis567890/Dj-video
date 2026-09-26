@@ -17,6 +17,16 @@ jobs:
           fetch-depth: 0
 
       # ==================================================
+      # 0. CLEAN STALE FILES FROM PREVIOUS RUNS
+      # ==================================================
+      - name: Clean stale generated files
+        run: |
+          rm -rf app core-audio core-dsp core-stems core-video core-db native
+          rm -f settings.gradle.kts build.gradle.kts gradle.properties
+          rm -rf gradle .gradle
+          find . -name "*.gradle.kts" -not -path "./.git/*" -delete 2>/dev/null || true
+
+      # ==================================================
       # 1. CREATE ALL DIRECTORIES
       # ==================================================
       - name: Create all directories
@@ -80,14 +90,8 @@ jobs:
           zipStorePath=wrapper/dists
           EOF
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: 8.7
-      - run: gradle wrapper --gradle-version 8.7
-
       # ==================================================
-      # 3. NATIVE MODULE (package: nativecore)
+      # 3. NATIVE MODULE (nativecore)
       # ==================================================
       - name: native/build.gradle.kts
         run: |
@@ -1208,16 +1212,30 @@ jobs:
           *.aab
           EOF
 
+      # ==================================================
+      # 6. GENERATE GRADLE WRAPPER (AFTER all files written)
+      # ==================================================
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.7
+
+      - name: Generate Gradle wrapper
+        run: gradle wrapper --gradle-version 8.7
+
+      # ==================================================
+      # 7. COMMIT
+      # ==================================================
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Full DJ app with nativecore package fix" || echo "nothing"
+          git commit -m "Full DJ app with nativecore fix + clean build" || echo "nothing"
           git push
 
       # ==================================================
-      # 6. BUILD
+      # 8. BUILD
       # ==================================================
       - name: JDK 17
         uses: actions/setup-java@v4
