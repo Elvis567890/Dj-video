@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import com.djpro.mixer.audio.AudioEngine
 import com.djpro.mixer.expand.DeckAnim
 import com.djpro.mixer.expand.ExpandableDeckManager
+import com.djpro.mixer.expand.VideoDeckView
 import com.djpro.mixer.expand.VideoMixPiP
 
 private const val SAMPLE_VIDEO_1 =
@@ -130,6 +131,7 @@ fun SixDeckScreen(engine: AudioEngine) {
                     modifier = Modifier.weight(1.4f).fillMaxHeight()
                 ) {
                     CenterVideoPanel(
+                        engine = engine,
                         crossfaderValue = crossfaderValue,
                         onCrossfaderChange = {
                             crossfaderValue = it
@@ -138,9 +140,18 @@ fun SixDeckScreen(engine: AudioEngine) {
                         echoOn = echoOn,
                         filterOn = filterOn,
                         vocalOff = vocalOff,
-                        onEchoToggle = { echoOn = !echoOn },
-                        onFilterToggle = { filterOn = !filterOn },
-                        onVocalToggle = { vocalOff = !vocalOff }
+                        onEchoToggle = {
+                            echoOn = !echoOn
+                            engine.setEcho(echoOn)
+                        },
+                        onFilterToggle = {
+                            filterOn = !filterOn
+                            engine.setFilter(filterOn)
+                        },
+                        onVocalToggle = {
+                            vocalOff = !vocalOff
+                            engine.setVocalRemoval(vocalOff)
+                        }
                     )
                 }
             }
@@ -292,6 +303,7 @@ private fun MiniDeckPanel(
 
 @Composable
 private fun CenterVideoPanel(
+    engine: AudioEngine,
     crossfaderValue: Float,
     onCrossfaderChange: (Float) -> Unit,
     echoOn: Boolean,
@@ -310,6 +322,7 @@ private fun CenterVideoPanel(
             .padding(10.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        // Real video mixing: two PlayerViews stacked, alpha driven by crossfader
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -319,7 +332,22 @@ private fun CenterVideoPanel(
                 .border(1.dp, Neon.CYAN.copy(alpha = 0.3f), RoundedCornerShape(10.dp)),
             contentAlignment = Alignment.Center
         ) {
-            Text("VIDEO MIX", color = Neon.CYAN.copy(alpha = 0.4f), fontSize = 12.sp)
+            VideoDeckView(
+                deck = engine.decks[0],
+                alpha = 1f,
+                modifier = Modifier.fillMaxSize()
+            )
+            VideoDeckView(
+                deck = engine.decks[1],
+                alpha = 1f - crossfaderValue,
+                modifier = Modifier.fillMaxSize()
+            )
+            Text(
+                "VIDEO MIX",
+                color = Neon.CYAN.copy(alpha = 0.35f),
+                fontSize = 11.sp,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(6.dp)
+            )
         }
 
         Slider(

@@ -5,8 +5,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
-enum class DeckSize { MINI, BIG, EXPANDED }
-
 data class DeckLayout(
     val expandedDeckId: Int? = null,
     val crossfaderA: Int = 0,

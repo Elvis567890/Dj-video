@@ -10,7 +10,6 @@ class AudioEngine(context: Context) {
 
     var crossfader: Float = 0.5f
         private set
-
     var masterVolume: Float = 1.0f
         private set
 
@@ -34,6 +33,21 @@ class AudioEngine(context: Context) {
     fun setMasterVolume(v: Float) {
         masterVolume = v.coerceIn(0f, 1f)
         setCrossfader(crossfader)
+    }
+
+    fun setEcho(on: Boolean) {
+        echoEnabled = on
+        decks.forEach { it.echo.enabled = on }
+    }
+
+    fun setFilter(on: Boolean) {
+        filterEnabled = on
+        decks.forEach { it.filter.enabled = on }
+    }
+
+    fun setVocalRemoval(on: Boolean) {
+        vocalRemovalEnabled = on
+        decks.forEach { it.vocal.enabled = on }
     }
 
     fun loadDeck(index: Int, uri: String) {
