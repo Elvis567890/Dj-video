@@ -124,35 +124,39 @@ fun SixDeckScreen(engine: AudioEngine) {
                     )
                 }
 
-                AnimatedVisibility(
-                    visible = !layout.videoFullscreen,
-                    enter = fadeIn(),
-                    exit = fadeOut(),
-                    modifier = Modifier.weight(1.4f).fillMaxHeight()
-                ) {
-                    CenterVideoPanel(
-                        engine = engine,
-                        crossfaderValue = crossfaderValue,
-                        onCrossfaderChange = {
-                            crossfaderValue = it
-                            engine.setCrossfader(it)
-                        },
-                        echoOn = echoOn,
-                        filterOn = filterOn,
-                        vocalOff = vocalOff,
-                        onEchoToggle = {
-                            echoOn = !echoOn
-                            engine.setEcho(echoOn)
-                        },
-                        onFilterToggle = {
-                            filterOn = !filterOn
-                            engine.setFilter(filterOn)
-                        },
-                        onVocalToggle = {
-                            vocalOff = !vocalOff
-                            engine.setVocalRemoval(vocalOff)
-                        }
-                    )
+                // Center panel: shown when video is NOT fullscreen
+                if (!layout.videoFullscreen) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1.4f)
+                            .fillMaxHeight()
+                    ) {
+                        CenterVideoPanel(
+                            engine = engine,
+                            crossfaderValue = crossfaderValue,
+                            onCrossfaderChange = {
+                                crossfaderValue = it
+                                engine.setCrossfader(it)
+                            },
+                            echoOn = echoOn,
+                            filterOn = filterOn,
+                            vocalOff = vocalOff,
+                            onEchoToggle = {
+                                echoOn = !echoOn
+                                engine.setEcho(echoOn)
+                            },
+                            onFilterToggle = {
+                                filterOn = !filterOn
+                                engine.setFilter(filterOn)
+                            },
+                            onVocalToggle = {
+                                vocalOff = !vocalOff
+                                engine.setVocalRemoval(vocalOff)
+                            }
+                        )
+                    }
+                } else {
+                    Spacer(Modifier.weight(1.4f))
                 }
             }
 
@@ -322,7 +326,6 @@ private fun CenterVideoPanel(
             .padding(10.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Real video mixing: two PlayerViews stacked, alpha driven by crossfader
         Box(
             modifier = Modifier
                 .fillMaxWidth()
