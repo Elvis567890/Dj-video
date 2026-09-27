@@ -45,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -253,42 +254,41 @@ private fun TopBar(recording: Boolean, clubMode: Boolean, onRecord: () -> Unit, 
     }
 }
 
-// ================== VIDEO / AUDIO STRIP ==================
 @Composable
 private fun VideoStrip(deckA: DeckPlayer, deckB: DeckPlayer, videoCrossfader: Float, transition: VideoTransition) {
     Box(modifier = Modifier.fillMaxWidth().aspectRatio(21f / 9f)
         .clip(RoundedCornerShape(10.dp)).background(Color.Black)
         .border(1.dp, Neon.BORDER_SOFT, RoundedCornerShape(10.dp))) {
 
-        // Deck A: video if hasVideo, else visualizer
         if (deckA.hasVideo) {
             VideoDeckView(deckA, videoCrossfader, false, transition, Neon.CYAN, true, Modifier.fillMaxSize())
-        } else {
-            AudioVisualizer(
-                accent = Neon.CYAN,
-                isPlaying = deckA.isPlaying,
-                trackName = deckA.loadedName,
-                modifier = Modifier.fillMaxSize()
-            )
+        } else if (deckA.isLoaded) {
+            AudioVisualizer(Neon.CYAN, deckA.isPlaying, deckA.loadedName, Modifier.fillMaxSize())
         }
 
-        // Deck B: video if hasVideo, else visualizer (with alpha from crossfader)
         if (deckB.hasVideo) {
             VideoDeckView(deckB, videoCrossfader, true, transition, Neon.MAGENTA, true, Modifier.fillMaxSize())
         } else if (deckB.isLoaded) {
             Box(modifier = Modifier.fillMaxSize().graphicsLayer {
                 alpha = (1f - videoCrossfader).coerceIn(0f, 1f)
             }) {
-                AudioVisualizer(
-                    accent = Neon.MAGENTA,
-                    isPlaying = deckB.isPlaying,
-                    trackName = deckB.loadedName,
-                    modifier = Modifier.fillMaxSize()
-                )
+                AudioVisualizer(Neon.MAGENTA, deckB.isPlaying, deckB.loadedName, Modifier.fillMaxSize())
             }
         }
 
-        // Top-left badge
+        if (!deckA.isLoaded && !deckB.isLoaded) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("LOAD A VIDEO OR AUDIO",
+                        color = Neon.CYAN.copy(alpha = 0.6f), fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold, letterSpacing = 6.sp)
+                    Spacer(Modifier.height(6.dp))
+                    Text("Tap LOAD on a deck  \u2022  Pick from LIBRARY below",
+                        color = Neon.TEXT_FAINT, fontSize = 10.sp, letterSpacing = 2.sp)
+                }
+            }
+        }
+
         Box(modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
             .clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.55f))
             .border(1.dp, Neon.CYAN.copy(alpha = 0.7f), RoundedCornerShape(50))
@@ -296,10 +296,9 @@ private fun VideoStrip(deckA: DeckPlayer, deckB: DeckPlayer, videoCrossfader: Fl
             Text("MIX", color = Neon.CYAN, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
         }
 
-        // Bottom-centre: transition name if both have video, else mode text
         val modeText = when {
             deckA.hasVideo && deckB.hasVideo -> transition.name
-            !deckA.hasVideo && !deckB.hasVideo -> "AUDIO MIX"
+            !deckA.hasVideo && !deckB.hasVideo && deckA.isLoaded && deckB.isLoaded -> "AUDIO MIX"
             deckA.hasVideo || deckB.hasVideo -> "VIDEO \u2022 AUDIO"
             else -> "READY"
         }
@@ -309,7 +308,6 @@ private fun VideoStrip(deckA: DeckPlayer, deckB: DeckPlayer, videoCrossfader: Fl
             Text(modeText, color = Color.White.copy(alpha = 0.95f), fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
         }
 
-        // LIVE dots top-right
         Row(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
             Box(modifier = Modifier.size(8.dp).clip(CircleShape)
                 .background(if (deckA.isPlaying) Neon.LIVE else Color(0x4000E5FF)))

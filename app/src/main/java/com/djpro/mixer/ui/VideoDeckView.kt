@@ -1,6 +1,6 @@
 package com.djpro.mixer.ui
 
-import android.view.TextureView
+import android.view.LayoutInflater
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -15,6 +15,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.ui.PlayerView
+import com.djpro.mixer.R
 import com.djpro.mixer.audio.DeckPlayer
 import kotlin.math.abs
 import kotlin.math.sin
@@ -65,15 +67,25 @@ fun VideoDeckView(
     }
     Box(modifier = modifier.clipToBounds()) {
         AndroidView(
-            modifier = Modifier.fillMaxSize().graphicsLayer {
-                this.alpha = alpha.coerceIn(0f, 1f)
-                scaleX = sx; scaleY = sy
-                translationX = tx; translationY = ty
-                rotationY = rotY; rotationZ = rotZ
-                cameraDistance = camDist * density
-            },
-            factory = { ctx -> TextureView(ctx).apply { isOpaque = true; deck.player.setVideoTextureView(this) } }
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    this.alpha = alpha.coerceIn(0f, 1f)
+                    scaleX = sx; scaleY = sy
+                    translationX = tx; translationY = ty
+                    rotationY = rotY; rotationZ = rotZ
+                    cameraDistance = camDist * density
+                },
+            factory = { ctx ->
+                val view = LayoutInflater.from(ctx)
+                    .inflate(R.layout.player_view, null) as PlayerView
+                view.player = deck.player
+                view.useController = false
+                view.setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
+                view
+            }
         )
+
         if (smoothT > 0.05f && alpha > 0.15f) {
             when (transition) {
                 VideoTransition.GLITCH -> GlitchOverlay(accentColor, smoothT, progress)
@@ -83,8 +95,8 @@ fun VideoDeckView(
             }
         }
         if (showScratchOverlay && deck.scratching && alpha > 0.3f) {
-            ScratchOverlay(accent = accentColor, rate = deck.scratchRate, velocity = deck.scratchVelocity,
-                modifier = Modifier.fillMaxSize().graphicsLayer { this.alpha = alpha.coerceIn(0f, 1f) })
+            ScratchOverlay(accentColor, deck.scratchRate, deck.scratchVelocity,
+                Modifier.fillMaxSize().graphicsLayer { this.alpha = alpha.coerceIn(0f, 1f) })
         }
     }
 }

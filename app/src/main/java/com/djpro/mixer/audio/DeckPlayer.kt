@@ -65,15 +65,12 @@ class DeckPlayer(val index: Int, context: Context) {
                 var foundVideo = false
                 for (group in tracks.groups) {
                     if (group.type == C.TRACK_TYPE_VIDEO && group.isSupported) {
-                        foundVideo = true
-                        break
+                        foundVideo = true; break
                     }
                 }
                 hasVideo = foundVideo
             }
-            override fun onIsPlayingChanged(isPlayingNow: Boolean) {
-                isPlaying = isPlayingNow
-            }
+            override fun onIsPlayingChanged(isPlayingNow: Boolean) { isPlaying = isPlayingNow }
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_ENDED) isPlaying = false
             }

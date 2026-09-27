@@ -9,8 +9,8 @@ android {
         applicationId = "com.ultimate.dj"
         minSdk = 26
         targetSdk = 34
-        versionCode = 21
-        versionName = "1.0.1"
+        versionCode = 22
+        versionName = "1.0.2"
     }
     buildTypes { release { isMinifyEnabled = false } }
     compileOptions {
