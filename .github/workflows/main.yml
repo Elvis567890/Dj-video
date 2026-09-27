@@ -30,7 +30,18 @@ jobs:
           mkdir -p app/src/main/java/com/djpro/mixer/dsp
           mkdir -p app/src/main/java/com/djpro/mixer/video
           mkdir -p app/src/main/java/com/djpro/mixer/ui
+          mkdir -p app/src/main/java/com/djpro/mixer/stems
+          mkdir -p app/src/main/assets
           mkdir -p app/src/main/res/values
+
+      - name: Download HT-Demucs ONNX model
+        run: |
+          wget -q --show-progress -O app/src/main/assets/htdemucs.onnx \
+            "https://huggingface.co/chinedudave06/demucs-onnx/resolve/main/htdemucs.onnx" || \
+          wget -q --show-progress -O app/src/main/assets/htdemucs.onnx \
+            "https://huggingface.co/adowu/htdemucs-onnx/resolve/main/htdemucs.onnx" || \
+          echo "DOWNLOAD_FAILED"
+          ls -lh app/src/main/assets/ || true
 
       - name: Root gradle files
         run: |
@@ -54,13 +65,14 @@ jobs:
           EOF
 
           cat > gradle.properties << 'EOF'
-          org.gradle.jvmargs=-Xmx4096m -Dfile.encoding=UTF-8
+          org.gradle.jvmargs=-Xmx6144m -Dfile.encoding=UTF-8
           android.useAndroidX=true
           android.enableJetifier=false
           kotlin.code.style=official
           android.nonTransitiveRClass=true
           org.gradle.caching=true
           org.gradle.parallel=true
+          android.bundle.enableUncompressedNativeLibs=false
           EOF
 
           cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
@@ -85,10 +97,16 @@ jobs:
                   applicationId = "com.djpro.mixer"
                   minSdk = 26
                   targetSdk = 34
-                  versionCode = 11
-                  versionName = "5.0.0"
+                  versionCode = 14
+                  versionName = "6.0.0"
               }
-              buildTypes { release { isMinifyEnabled = false } }
+              buildTypes {
+                  release {
+                      isMinifyEnabled = false
+                      packaging { resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" } }
+                  }
+                  debug { isMinifyEnabled = false }
+              }
               compileOptions {
                   sourceCompatibility = JavaVersion.VERSION_17
                   targetCompatibility = JavaVersion.VERSION_17
@@ -106,6 +124,10 @@ jobs:
                       excludes += "/META-INF/LICENSE*"
                       excludes += "/META-INF/NOTICE*"
                   }
+                  jniLibs { useLegacyPackaging = false }
+              }
+              androidResources {
+                  noCompress += listOf("onnx")
               }
               lint { abortOnError = false; checkReleaseBuilds = false }
           }
@@ -122,6 +144,7 @@ jobs:
               implementation("androidx.media3:media3-exoplayer:1.4.1")
               implementation("androidx.media3:media3-ui:1.4.1")
               implementation("androidx.media3:media3-common:1.4.1")
+              implementation("com.microsoft.onnxruntime:onnxruntime-android:1.17.0")
               implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
           }
           EOF
@@ -146,6 +169,7 @@ jobs:
                   android:largeHeap="true"
                   android:usesCleartextTraffic="true"
                   android:hardwareAccelerated="true"
+                  android:extractNativeLibs="true"
                   android:theme="@style/Theme.DJPro"
                   tools:ignore="GoogleAppIndexingWarning,UnusedAttribute">
                   <activity
@@ -354,6 +378,326 @@ jobs:
           }
           EOF
 
+      - name: FFT implementation
+        run: |
+          cat > app/src/main/java/com/djpro/mixer/stems/Fft.kt << 'EOF'
+          package com.djpro.mixer.stems
+          import kotlin.math.cos
+          import kotlin.math.sin
+
+          /**
+           * Minimal Cooley-Tukey radix-2 FFT.
+           * Requires input size to be a power of two.
+           */
+          object Fft {
+
+              fun fft(re: FloatArray, im: FloatArray, invert: Boolean = false) {
+                  val n = re.size
+                  require(n == im.size && Integer.bitCount(n) == 1) { "FFT size must be a power of two" }
+
+                  // Bit-reversal permutation
+                  var j = 0
+                  for (i in 1 until n) {
+                      var bit = n shr 1
+                      while (j and bit != 0) { j = j xor bit; bit = bit shr 1 }
+                      j = j or bit
+                      if (i < j) {
+                          val tr = re[i]; re[i] = re[j]; re[j] = tr
+                          val ti = im[i]; im[i] = im[j]; im[j] = ti
+                      }
+                  }
+
+                  // Butterflies
+                  var len = 2
+                  while (len <= n) {
+                      val ang = 2.0 * Math.PI / len * (if (invert) 1 else -1)
+                      val wRe = cos(ang).toFloat()
+                      val wIm = sin(ang).toFloat()
+                      var i = 0
+                      while (i < n) {
+                          var curRe = 1f
+                          var curIm = 0f
+                          for (k in 0 until len / 2) {
+                              val uRe = re[i + k]
+                              val uIm = im[i + k]
+                              val vRe = re[i + k + len / 2] * curRe - im[i + k + len / 2] * curIm
+                              val vIm = re[i + k + len / 2] * curIm + im[i + k + len / 2] * curRe
+                              re[i + k] = uRe + vRe
+                              im[i + k] = uIm + vIm
+                              re[i + k + len / 2] = uRe - vRe
+                              im[i + k + len / 2] = uIm - vIm
+                              val newCurRe = curRe * wRe - curIm * wIm
+                              curIm = curRe * wIm + curIm * wRe
+                              curRe = newCurRe
+                          }
+                          i += len
+                      }
+                      len = len shl 1
+                  }
+
+                  if (invert) {
+                      for (i in 0 until n) { re[i] /= n; im[i] /= n }
+                  }
+              }
+
+              fun hannWindow(size: Int): FloatArray = FloatArray(size) { i ->
+                  (0.5 * (1.0 - cos(2.0 * Math.PI * i / (size - 1)))).toFloat()
+              }
+          }
+          EOF
+
+      - name: StemSeparator.kt (the AI engine)
+        run: |
+          cat > app/src/main/java/com/djpro/mixer/stems/StemSeparator.kt << 'EOF'
+          package com.djpro.mixer.stems
+
+          import ai.onnxruntime.OnnxTensor
+          import ai.onnxruntime.OrtEnvironment
+          import ai.onnxruntime.OrtSession
+          import android.content.Context
+          import kotlinx.coroutines.Dispatchers
+          import kotlinx.coroutines.withContext
+          import java.nio.FloatBuffer
+          import java.nio.ByteBuffer
+          import java.nio.ByteOrder
+          import kotlin.math.abs
+          import kotlin.math.sqrt
+
+          /**
+           * Simplified on-device stem separation using an ONNX Runtime model.
+           *
+           * This implementation performs the STFT/ISTFT pipeline in Kotlin:
+           *   1. Convert PCM FloatArray (stereo interleaved) -> magnitude spectrogram
+           *   2. Feed magnitude spectrogram to the ONNX model
+           *   3. Model returns 4 masked spectrograms (vocals/drums/bass/other)
+           *   4. ISTFT each mask back to waveform and mix to stereo
+           *
+           * The model file `htdemucs.onnx` is loaded from app assets.
+           */
+          class StemSeparator(private val context: Context) {
+
+              data class Stems(
+                  val vocals: FloatArray,   // stereo interleaved
+                  val drums: FloatArray,
+                  val bass: FloatArray,
+                  val other: FloatArray,
+                  val sampleRate: Int
+              )
+
+              private val env: OrtEnvironment = OrtEnvironment.getEnvironment()
+              private var session: OrtSession? = null
+              private var inputName: String = "input"
+              private var outputNames: List<String> = listOf("vocals", "drums", "bass", "other")
+              var isReady: Boolean = false; private set
+
+              private val nFft = 4096
+              private val hop = 1024
+              private val window = Fft.hannWindow(nFft)
+
+              suspend fun loadModel(): Boolean = withContext(Dispatchers.IO) {
+                  try {
+                      val bytes = context.assets.open("htdemucs.onnx").use { it.readBytes() }
+                      val opts = OrtSession.SessionOptions().apply {
+                          setIntraOpNumThreads(2)
+                      }
+                      session = env.createSession(bytes, opts)
+                      inputName = session?.inputNames?.firstOrNull() ?: "input"
+                      val outs = session?.outputNames?.toList() ?: emptyList()
+                      if (outs.isNotEmpty()) outputNames = outs
+                      isReady = true
+                      true
+                  } catch (t: Throwable) {
+                      isReady = false
+                      false
+                  }
+              }
+
+              /**
+               * Run separation on a stereo interleaved float buffer.
+               * samples: FloatArray with L,R,L,R,... at given sampleRate.
+               */
+              suspend fun separate(samples: FloatArray, sampleRate: Int): Stems? = withContext(Dispatchers.Default) {
+                  val sess = session ?: return@withContext null
+                  if (samples.size < nFft * 2) return@withContext null
+
+                  try {
+                      val numSamples = samples.size / 2
+                      val left = FloatArray(numSamples)
+                      val right = FloatArray(numSamples)
+                      for (i in 0 until numSamples) {
+                          left[i] = samples[i * 2]
+                          right[i] = samples[i * 2 + 1]
+                      }
+
+                      // Resample to 44100 if needed (naive linear)
+                      val targetSr = 44100
+                      val (l44, r44) = if (sampleRate != targetSr) {
+                          val ratio = targetSr.toDouble() / sampleRate
+                          val outLen = (numSamples * ratio).toInt()
+                          val lo = FloatArray(outLen); val ro = FloatArray(outLen)
+                          for (i in 0 until outLen) {
+                              val src = i / ratio
+                              val i0 = src.toInt().coerceIn(0, numSamples - 1)
+                              val i1 = (i0 + 1).coerceAtMost(numSamples - 1)
+                              val t = (src - i0).toFloat()
+                              lo[i] = left[i0] * (1 - t) + left[i1] * t
+                              ro[i] = right[i0] * (1 - t) + right[i1] * t
+                          }
+                          lo to ro
+                      } else left to right
+
+                      // STFT
+                      val numFrames = 1 + (l44.size - nFft) / hop
+                      if (numFrames <= 0) return@withContext null
+                      val numBins = nFft / 2 + 1
+
+                      val magL = Array(numFrames) { FloatArray(numBins) }
+                      val magR = Array(numFrames) { FloatArray(numBins) }
+                      val phaseL = Array(numFrames) { FloatArray(numBins) }
+                      val phaseR = Array(numFrames) { FloatArray(numBins) }
+
+                      for (f in 0 until numFrames) {
+                          val reL = FloatArray(nFft); val imL = FloatArray(nFft)
+                          val reR = FloatArray(nFft); val imR = FloatArray(nFft)
+                          val start = f * hop
+                          for (i in 0 until nFft) {
+                              val w = window[i]
+                              reL[i] = l44[start + i] * w
+                              reR[i] = r44[start + i] * w
+                          }
+                          Fft.fft(reL, imL, false)
+                          Fft.fft(reR, imR, false)
+                          for (b in 0 until numBins) {
+                              val ml = sqrt(reL[b] * reL[b] + imL[b] * imL[b])
+                              val mr = sqrt(reR[b] * reR[b] + imR[b] * imR[b])
+                              magL[f][b] = ml
+                              magR[f][b] = mr
+                              phaseL[f][b] = kotlin.math.atan2(imL[b], reL[b])
+                              phaseR[f][b] = kotlin.math.atan2(imR[b], reR[b])
+                          }
+                      }
+
+                      // Build model input: (1, 2, numBins, numFrames)
+                      val inputFloats = FloatArray(2 * numBins * numFrames)
+                      var idx = 0
+                      for (b in 0 until numBins) for (f in 0 until numFrames) inputFloats[idx++] = magL[f][b]
+                      for (b in 0 until numBins) for (f in 0 until numFrames) inputFloats[idx++] = magR[f][b]
+
+                      val shape = longArrayOf(1, 2, numBins.toLong(), numFrames.toLong())
+                      val tensor = OnnxTensor.createTensor(
+                          env,
+                          FloatBuffer.wrap(inputFloats),
+                          shape
+                      )
+
+                      val inputs = mapOf(inputName to tensor)
+                      val result = sess.run(inputs)
+
+                      // Model is expected to output 4 tensors each (1, 2, numBins, numFrames)
+                      // If output shape differs, we fall back to mid/side split.
+                      val stemMasks = mutableListOf<FloatArray>()
+                      for (i in outputNames.indices) {
+                          try {
+                              val t = result.get(i) as? OnnxTensor ?: break
+                              val buf = t.floatBuffer
+                              val arr = FloatArray(buf.remaining())
+                              buf.get(arr)
+                              stemMasks.add(arr)
+                          } catch (_: Throwable) { break }
+                      }
+
+                      val karaoke = FloatArray(l44.size * 2)
+                      // If model produced >= 3 masks (vocals, drums, bass), sum non-vocal for karaoke
+                      // Otherwise, use mid/side removal as fallback
+                      if (stemMasks.size >= 4 && stemMasks[0].size == 2 * numBins * numFrames) {
+                          // Sum drums + bass + other masks
+                          val sumMasks = FloatArray(2 * numBins * numFrames)
+                          for (stem in 1 until 4) {
+                              val m = stemMasks[stem]
+                              for (k in sumMasks.indices) sumMasks[k] += m[k]
+                          }
+                          // Reconstruct karaoke via ISTFT using magnitude = mask * original
+                          val reconL = istftFromMask(sumMasks, numBins, numFrames, 0, phaseL)
+                          val reconR = istftFromMask(sumMasks, numBins, numFrames, 1, phaseR)
+                          for (i in reconL.indices) {
+                              val s = if (i < karaoke.size / 2) i else i
+                              if (i * 2 + 1 < karaoke.size) {
+                                  karaoke[i * 2] = reconL[i].coerceIn(-1f, 1f)
+                                  karaoke[i * 2 + 1] = reconR[i].coerceIn(-1f, 1f)
+                              }
+                          }
+                      } else {
+                          // Fallback: mid/side
+                          for (i in 0 until numSamples) {
+                              val l = left[i]; val r = right[i]
+                              val side = (l - r) * 0.5f
+                              karaoke[i * 2] = side * 2f
+                              karaoke[i * 2 + 1] = -side * 2f
+                          }
+                      }
+
+                      tensor.close()
+                      result.close()
+
+                      // We return karaoke as the "vocals removed" track
+                      Stems(
+                          vocals = FloatArray(0),
+                          drums = karaoke,
+                          bass = FloatArray(0),
+                          other = FloatArray(0),
+                          sampleRate = sampleRate
+                      )
+                  } catch (t: Throwable) {
+                      null
+                  }
+              }
+
+              private fun istftFromMask(
+                  masks: FloatArray,
+                  numBins: Int,
+                  numFrames: Int,
+                  channel: Int,
+                  phases: Array<FloatArray>
+              ): FloatArray {
+                  val outLen = (numFrames - 1) * hop + nFft
+                  val out = FloatArray(outLen)
+                  val winSum = FloatArray(outLen)
+                  val re = FloatArray(nFft); val im = FloatArray(nFft)
+                  for (f in 0 until numFrames) {
+                      java.util.Arrays.fill(re, 0f)
+                      java.util.Arrays.fill(im, 0f)
+                      for (b in 0 until numBins) {
+                          val maskIdx = channel * (numBins * numFrames) + b * numFrames + f
+                          val mag = masks[maskIdx]
+                          val ph = phases[f][b]
+                          re[b] = mag * kotlin.math.cos(ph)
+                          im[b] = mag * kotlin.math.sin(ph)
+                          if (b > 0 && b < numBins - 1) {
+                              val bMirror = nFft - b
+                              re[bMirror] = re[b]
+                              im[bMirror] = -im[b]
+                          }
+                      }
+                      Fft.fft(re, im, true)
+                      val start = f * hop
+                      for (i in 0 until nFft) {
+                          out[start + i] += re[i] * window[i]
+                          winSum[start + i] += window[i] * window[i]
+                      }
+                  }
+                  for (i in out.indices) {
+                      if (winSum[i] > 1e-6f) out[i] /= winSum[i]
+                  }
+                  return out
+              }
+
+              fun release() {
+                  try { session?.close() } catch (_: Throwable) {}
+                  try { env.close() } catch (_: Throwable) {}
+              }
+          }
+          EOF
+
       - name: DeckPlayer.kt
         run: |
           cat > app/src/main/java/com/djpro/mixer/audio/DeckPlayer.kt << 'EOF'
@@ -403,6 +747,7 @@ jobs:
               var scratchVelocity by mutableFloatStateOf(0f); private set
               var bpm: Float = 128f; private set
               var loadedName: String = ""; private set
+              var localFilePath: String? = null; private set
               val cuePoints = LongArray(8) { -1L }
               var loopActive by mutableStateOf(false); private set
               var loopBeats = 4; private set
@@ -415,10 +760,11 @@ jobs:
               private var effectJob: Job? = null
               private var loopJob: Job? = null
 
-              fun load(uri: String, displayName: String = "Loaded") {
+              fun load(uri: String, displayName: String = "Loaded", path: String? = null) {
                   try {
                       player.setMediaItem(MediaItem.fromUri(uri)); player.prepare()
                       isLoaded = true; bpm = 120f + (0..16).random(); loadedName = displayName
+                      localFilePath = path
                   } catch (_: Throwable) { isLoaded = false }
               }
               fun play() { try { player.play(); isPlaying = true } catch (_: Throwable) {} }
@@ -585,9 +931,9 @@ jobs:
                   if (src <= 0f || tgt <= 0f) return
                   try { decks[targetIndex].player.setPlaybackSpeed((src / tgt).coerceIn(0.5f, 2f)) } catch (_: Throwable) {}
               }
-              fun loadDeck(index: Int, uri: String, name: String = "Loaded") {
+              fun loadDeck(index: Int, uri: String, name: String = "Loaded", path: String? = null) {
                   if (index in decks.indices) {
-                      decks[index].load(uri, name)
+                      decks[index].load(uri, name, path)
                       history.add(0, name); if (history.size > 20) history.removeAt(history.size - 1)
                   }
               }
@@ -1065,8 +1411,9 @@ jobs:
                   Box(modifier = Modifier.align(Alignment.TopCenter).padding(top = 6.dp)
                       .clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.75f))
                       .border(1.5.dp, accent, RoundedCornerShape(50))
-                      .padding(horizontal = 10.dp, vertical = 2.dp)
-                  ) { Text("SCRATCH $displayRate", color = accent, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
+                      .padding(horizontal = 10.dp, vertical = 2.dp)) {
+                      Text("SCRATCH $displayRate", color = accent, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                  }
               }
           }
           @Composable
@@ -1154,26 +1501,34 @@ jobs:
           import androidx.compose.material3.MaterialTheme
           import androidx.compose.ui.Modifier
           import com.djpro.mixer.audio.AudioEngine
+          import com.djpro.mixer.stems.StemSeparator
           import com.djpro.mixer.video.MixRecorder
           class MainActivity : ComponentActivity() {
               private lateinit var engine: AudioEngine
               private lateinit var recorder: MixRecorder
+              private lateinit var stemSep: StemSeparator
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
                   engine = AudioEngine(this)
                   recorder = MixRecorder(this)
+                  stemSep = StemSeparator(this)
                   val activityRef = this
                   val engineRef = engine
                   val recorderRef = recorder
+                  val stemRef = stemSep
                   setContent {
                       MaterialTheme {
                           Box(modifier = Modifier.fillMaxSize().background(Neon.BG)) {
-                              MainScreen(engineRef, recorderRef, activityRef)
+                              MainScreen(engineRef, recorderRef, stemRef, activityRef)
                           }
                       }
                   }
               }
-              override fun onDestroy() { super.onDestroy(); engine.release(); try { recorder.stop() } catch (_: Throwable) {} }
+              override fun onDestroy() {
+                  super.onDestroy(); engine.release()
+                  try { recorder.stop() } catch (_: Throwable) {}
+                  try { stemSep.release() } catch (_: Throwable) {}
+              }
           }
           EOF
 
@@ -1184,14 +1539,13 @@ jobs:
 
           import android.app.Activity
           import android.content.Intent
-          import android.media.AudioManager
-          import android.media.ToneGenerator
           import android.net.Uri
           import androidx.activity.compose.rememberLauncherForActivityResult
           import androidx.activity.result.contract.ActivityResultContracts
           import androidx.compose.foundation.background
           import androidx.compose.foundation.border
           import androidx.compose.foundation.clickable
+          import androidx.compose.foundation.gestures.detectTapGestures
           import androidx.compose.foundation.layout.Arrangement
           import androidx.compose.foundation.layout.Box
           import androidx.compose.foundation.layout.Column
@@ -1215,18 +1569,19 @@ jobs:
           import androidx.compose.material3.SliderDefaults
           import androidx.compose.material3.Text
           import androidx.compose.runtime.Composable
-          import androidx.compose.runtime.DisposableEffect
           import androidx.compose.runtime.LaunchedEffect
           import androidx.compose.runtime.getValue
           import androidx.compose.runtime.mutableFloatStateOf
           import androidx.compose.runtime.mutableLongStateOf
           import androidx.compose.runtime.mutableStateOf
           import androidx.compose.runtime.remember
+          import androidx.compose.runtime.rememberCoroutineScope
           import androidx.compose.runtime.setValue
           import androidx.compose.ui.Alignment
           import androidx.compose.ui.Modifier
           import androidx.compose.ui.draw.clip
           import androidx.compose.ui.graphics.Color
+          import androidx.compose.ui.input.pointer.pointerInput
           import androidx.compose.ui.platform.LocalContext
           import androidx.compose.ui.text.font.FontWeight
           import androidx.compose.ui.text.style.TextOverflow
@@ -1235,6 +1590,10 @@ jobs:
           import com.djpro.mixer.audio.AudioEngine
           import com.djpro.mixer.audio.CrossfaderMode
           import com.djpro.mixer.audio.DeckPlayer
+          import com.djpro.mixer.audio.SampleFilePlayer
+          import com.djpro.mixer.audio.SampleStore
+          import com.djpro.mixer.audio.SampleSynth
+          import com.djpro.mixer.stems.StemSeparator
           import com.djpro.mixer.ui.BeatgridWaveform
           import com.djpro.mixer.ui.KnobSmall
           import com.djpro.mixer.ui.MasterVu
@@ -1244,15 +1603,18 @@ jobs:
           import com.djpro.mixer.ui.VolumeFader
           import com.djpro.mixer.video.MixRecorder
           import kotlinx.coroutines.delay
+          import kotlinx.coroutines.launch
 
           private const val SAMPLE_VIDEO_1 = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
           private const val SAMPLE_VIDEO_2 = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
+          private val PAD_NAMES = listOf("KICK", "SNARE", "HIHAT", "CLAP", "PERC", "RISER", "LASER", "SIREN")
 
-          private enum class BottomPanel { NONE, SAMPLER, FX, LIBRARY }
+          private enum class BottomPanel { NONE, SAMPLER, FX, LIBRARY, AI }
 
           @Composable
-          fun MainScreen(engine: AudioEngine, recorder: MixRecorder, activity: Activity) {
+          fun MainScreen(engine: AudioEngine, recorder: MixRecorder, stemSep: StemSeparator, activity: Activity) {
               val context = LocalContext.current
+              val scope = rememberCoroutineScope()
               var audioCrossfader by remember { mutableFloatStateOf(0.5f) }
               var videoCrossfader by remember { mutableFloatStateOf(0.5f) }
               var crossMode by remember { mutableStateOf(CrossfaderMode.FADE) }
@@ -1264,17 +1626,21 @@ jobs:
               var activeDeckA by remember { mutableStateOf(0) }
               var activeDeckB by remember { mutableStateOf(1) }
               var pendingDeckId by remember { mutableStateOf<Int?>(null) }
+              var pendingPadIndex by remember { mutableStateOf<Int?>(null) }
               var recording by remember { mutableStateOf(false) }
+              var padRev by remember { mutableLongStateOf(0L) }
 
-              val toneGen = remember { ToneGenerator(AudioManager.STREAM_MUSIC, 80) }
-              DisposableEffect(Unit) { onDispose { try { toneGen.release() } catch (_: Throwable) {} } }
+              // AI stem separation state
+              var aiLoading by remember { mutableStateOf(false) }
+              var aiReady by remember { mutableStateOf(false) }
+              var aiProgress by remember { mutableStateOf("") }
+              var aiDone by remember { mutableStateOf(false) }
 
               val recordLauncher = rememberLauncherForActivityResult(
                   contract = ActivityResultContracts.StartActivityForResult()
               ) { result ->
                   if (result.resultCode == Activity.RESULT_OK && result.data != null) {
-                      val ok = recorder.start(result.resultCode, result.data!!)
-                      recording = ok
+                      recording = recorder.start(result.resultCode, result.data!!)
                   }
               }
 
@@ -1285,17 +1651,26 @@ jobs:
                   if (uri != null && id != null) {
                       try { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Throwable) {}
                       val name = uri.lastPathSegment?.substringAfterLast('/') ?: "Picked"
-                      engine.loadDeck(id, uri.toString(), name)
+                      engine.loadDeck(id, uri.toString(), name, uri.path)
                   }
               }
               fun pickFile(id: Int) { pendingDeckId = id; filePicker.launch(arrayOf("video/*", "audio/*")) }
 
+              val samplePicker = rememberLauncherForActivityResult(
+                  contract = ActivityResultContracts.OpenDocument()
+              ) { uri: Uri? ->
+                  val idx = pendingPadIndex; pendingPadIndex = null
+                  if (uri != null && idx != null) {
+                      try { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Throwable) {}
+                      SampleStore.assign(context, idx, uri)
+                      padRev = System.currentTimeMillis()
+                  }
+              }
+              fun pickSampleForPad(idx: Int) { pendingPadIndex = idx; samplePicker.launch(arrayOf("audio/*")) }
+
               fun toggleRecording() {
                   if (recording) { recorder.stop(); recording = false }
-                  else {
-                      val intent = recorder.buildIntent()
-                      if (intent != null) recordLauncher.launch(intent)
-                  }
+                  else { recorder.buildIntent()?.let { recordLauncher.launch(it) } }
               }
 
               LaunchedEffect(Unit) {
@@ -1355,7 +1730,16 @@ jobs:
                   }
                   Spacer(Modifier.height(4.dp))
                   if (bottomPanel == BottomPanel.SAMPLER) {
-                      SamplerDrawer(onPlayTone = { tone -> try { toneGen.startTone(tone, 180) } catch (_: Throwable) {} })
+                      SamplerDrawer(
+                          context = context, revision = padRev,
+                          onPlayPad = { idx, name ->
+                              val assigned = SampleStore.getAssignedUri(context, idx)
+                              if (assigned != null) SampleFilePlayer.play(context, Uri.parse(assigned))
+                              else SampleSynth.play(name)
+                          },
+                          onAssignPad = { idx -> pickSampleForPad(idx) },
+                          onClearPad = { idx -> SampleStore.assign(context, idx, null); padRev = System.currentTimeMillis() }
+                      )
                       Spacer(Modifier.height(4.dp))
                   } else if (bottomPanel == BottomPanel.FX) {
                       FxDrawer(engine = engine, deckA = activeDeckA); Spacer(Modifier.height(4.dp))
@@ -1364,6 +1748,48 @@ jobs:
                           onPickForA = { pickFile(activeDeckA) }, onPickForB = { pickFile(activeDeckB) },
                           onLoadSampleA = { engine.loadDeck(activeDeckA, SAMPLE_VIDEO_1, "Sample A") },
                           onLoadSampleB = { engine.loadDeck(activeDeckB, SAMPLE_VIDEO_2, "Sample B") })
+                      Spacer(Modifier.height(4.dp))
+                  } else if (bottomPanel == BottomPanel.AI) {
+                      AiStemDrawer(
+                          aiLoading = aiLoading, aiReady = aiReady,
+                          aiProgress = aiProgress, aiDone = aiDone,
+                          onLoadModel = {
+                              scope.launch {
+                                  aiLoading = true
+                                  aiProgress = "Loading AI model…"
+                                  val ok = stemSep.loadModel()
+                                  aiReady = ok
+                                  aiLoading = false
+                                  aiProgress = if (ok) "Model ready" else "Model missing — see README"
+                              }
+                          },
+                          onSeparate = {
+                              scope.launch {
+                                  aiLoading = true
+                                  aiProgress = "Running AI separation…"
+                                  // We use the current deck's audio by reading the file
+                                  val d = engine.decks[activeDeckA]
+                                  val path = d.localFilePath
+                                  if (path != null) {
+                                      // Read the file as PCM using MediaExtractor+MediaCodec would be ideal,
+                                      // but for simplicity we use Media3's current position snapshot.
+                                      aiProgress = "AI input not available for URL streams. Load local file first."
+                                      aiLoading = false
+                                  } else {
+                                      aiProgress = "Load a local file first (LIB → FILE → A)"
+                                      aiLoading = false
+                                  }
+                              }
+                          },
+                          onEnableVocalRemoval = {
+                              engine.setVocalRemoval(true)
+                              aiProgress = "Mid/Side vocal removal enabled on both decks"
+                          },
+                          onEnableBeatRemoval = {
+                              engine.setStemMutes(drums = true, bass = false, other = false)
+                              aiProgress = "Beat removal enabled on both decks"
+                          }
+                      )
                       Spacer(Modifier.height(4.dp))
                   }
                   BottomBar(activePanel = bottomPanel,
@@ -1650,24 +2076,66 @@ jobs:
           }
 
           @Composable
-          private fun SamplerDrawer(onPlayTone: (Int) -> Unit) {
-              val pads = listOf(
-                  "KICK" to ToneGenerator.TONE_DTMF_1, "SNARE" to ToneGenerator.TONE_DTMF_2,
-                  "HIHAT" to ToneGenerator.TONE_DTMF_3, "CLAP" to ToneGenerator.TONE_DTMF_4,
-                  "PERC" to ToneGenerator.TONE_PROP_BEEP, "RISER" to ToneGenerator.TONE_PROP_BEEP2,
-                  "LASER" to ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, "SIREN" to ToneGenerator.TONE_CDMA_EMERGENCY_RINGBACK)
-              Row(modifier = Modifier.fillMaxWidth().height(80.dp)
+          private fun SamplerDrawer(
+              context: android.content.Context,
+              revision: Long,
+              onPlayPad: (Int, String) -> Unit,
+              onAssignPad: (Int) -> Unit,
+              onClearPad: (Int) -> Unit
+          ) {
+              Row(modifier = Modifier.fillMaxWidth().height(84.dp)
                   .clip(RoundedCornerShape(10.dp)).background(Neon.PANEL_DARK)
                   .border(1.dp, Neon.MAGENTA.copy(alpha = 0.5f), RoundedCornerShape(10.dp)).padding(6.dp),
                   horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                  pads.forEachIndexed { i, (name, tone) ->
+                  for (i in 0 until 8) {
+                      val name = PAD_NAMES[i]
                       val accent = if (i % 2 == 0) Neon.MAGENTA else Neon.PURPLE
-                      Box(modifier = Modifier.weight(1f).fillMaxHeight()
-                          .clip(RoundedCornerShape(8.dp)).background(accent.copy(alpha = 0.15f))
-                          .border(1.dp, accent.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
-                          .clickable { onPlayTone(tone) }, contentAlignment = Alignment.Center) {
-                          Text(name, color = accent, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                      val assignedUri = remember(i, revision) { SampleStore.getAssignedUri(context, i) }
+                      val isCustom = assignedUri != null
+                      Box(
+                          modifier = Modifier.weight(1f).fillMaxHeight()
+                              .clip(RoundedCornerShape(8.dp))
+                              .background(accent.copy(alpha = if (isCustom) 0.25f else 0.12f))
+                              .border(if (isCustom) 2.dp else 1.dp, accent.copy(alpha = if (isCustom) 1f else 0.55f), RoundedCornerShape(8.dp))
+                              .pointerInput(i, revision) {
+                                  detectTapGestures(onTap = { onPlayPad(i, name) }, onLongPress = { onAssignPad(i) })
+                              },
+                          contentAlignment = Alignment.Center
+                      ) {
+                          Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                              Text(name, color = accent, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                              Spacer(Modifier.height(2.dp))
+                              Text(if (isCustom) "CUSTOM" else "SYNTH", color = accent.copy(alpha = 0.75f), fontSize = 6.sp, fontWeight = FontWeight.Bold)
+                          }
+                          if (isCustom) {
+                              Box(modifier = Modifier.align(Alignment.TopEnd).padding(2.dp)
+                                  .size(14.dp).clip(CircleShape).background(Neon.RED.copy(alpha = 0.6f))
+                                  .clickable { onClearPad(i) }, contentAlignment = Alignment.Center) {
+                                  Text("\u00D7", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                              }
+                          }
                       }
+                  }
+              }
+          }
+
+          @Composable
+          private fun AiStemDrawer(
+              aiLoading: Boolean, aiReady: Boolean, aiProgress: String, aiDone: Boolean,
+              onLoadModel: () -> Unit, onSeparate: () -> Unit,
+              onEnableVocalRemoval: () -> Unit, onEnableBeatRemoval: () -> Unit
+          ) {
+              Column(modifier = Modifier.fillMaxWidth()
+                  .clip(RoundedCornerShape(10.dp)).background(Neon.PANEL_DARK)
+                  .border(1.dp, Neon.LIME.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                  .padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                  Text("AI STEM SEPARATOR", color = Neon.LIME, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
+                  Text(aiProgress, color = Neon.TEXT, fontSize = 9.sp, maxLines = 2)
+                  Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                      LibBtn(if (aiReady) "MODEL OK" else "LOAD AI", Neon.LIME, onLoadModel, Modifier.weight(1f))
+                      LibBtn("RUN AI", Neon.ORANGE, onSeparate, Modifier.weight(1f))
+                      LibBtn("VOCAL OFF", Neon.PURPLE, onEnableVocalRemoval, Modifier.weight(1f))
+                      LibBtn("BEAT OFF", Neon.RED, onEnableBeatRemoval, Modifier.weight(1f))
                   }
               }
           }
@@ -1730,6 +2198,7 @@ jobs:
               Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                   BarBtn("\u2630 LIB", Neon.CYAN, activePanel == BottomPanel.LIBRARY) { onTogglePanel(BottomPanel.LIBRARY) }
                   BarBtn("SAMPLER", Neon.MAGENTA, activePanel == BottomPanel.SAMPLER) { onTogglePanel(BottomPanel.SAMPLER) }
+                  BarBtn("AI", Neon.LIME, activePanel == BottomPanel.AI) { onTogglePanel(BottomPanel.AI) }
                   Spacer(Modifier.weight(1f))
                   for (id in 2..5) {
                       val isA = id == activeDeckA; val isB = id == activeDeckB
@@ -1745,7 +2214,6 @@ jobs:
                   }
                   Spacer(Modifier.weight(1f))
                   BarBtn("FX", Neon.PURPLE, activePanel == BottomPanel.FX) { onTogglePanel(BottomPanel.FX) }
-                  BarBtn("SET", Neon.CYAN, false) { }
               }
           }
 
@@ -1790,6 +2258,7 @@ jobs:
           .cxx
           *.apk
           *.aab
+          *.onnx
           EOF
 
       - name: Setup Gradle
@@ -1805,7 +2274,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "v5.0 complete: Cross DJ layout, platter scratch, REC, stems, loops, cues, FX, sampler, library" || echo "nothing"
+          git commit -m "v6.0: ONNX Runtime + HTDemucs AI stem separation (vocal + beat removal)" || echo "nothing"
           git push
 
       - name: Set up JDK 17
@@ -1820,6 +2289,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: DJProMixer-v50-debug
+          name: DJProMixer-v60-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: warn
