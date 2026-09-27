@@ -56,8 +56,9 @@ fun ScratchOverlay(accent: Color, rate: Float, velocity: Float, modifier: Modifi
         Box(modifier = Modifier.align(Alignment.TopCenter).padding(top = 6.dp)
             .clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.75f))
             .border(1.5.dp, accent, RoundedCornerShape(50))
-            .padding(horizontal = 10.dp, vertical = 2.dp)
-        ) { Text("SCRATCH $displayRate", color = accent, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
+            .padding(horizontal = 10.dp, vertical = 2.dp)) {
+            Text("SCRATCH $displayRate", color = accent, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+        }
     }
 }
 @Composable

@@ -2,14 +2,14 @@ package com.djpro.mixer
 
 import android.app.Activity
 import android.content.Intent
-import android.media.AudioManager
-import android.media.ToneGenerator
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -33,7 +34,6 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -45,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -53,6 +54,9 @@ import androidx.compose.ui.unit.sp
 import com.djpro.mixer.audio.AudioEngine
 import com.djpro.mixer.audio.CrossfaderMode
 import com.djpro.mixer.audio.DeckPlayer
+import com.djpro.mixer.audio.SampleFilePlayer
+import com.djpro.mixer.audio.SampleStore
+import com.djpro.mixer.audio.SampleSynth
 import com.djpro.mixer.ui.BeatgridWaveform
 import com.djpro.mixer.ui.KnobSmall
 import com.djpro.mixer.ui.MasterVu
@@ -65,6 +69,7 @@ import kotlinx.coroutines.delay
 
 private const val SAMPLE_VIDEO_1 = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
 private const val SAMPLE_VIDEO_2 = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
+private val PAD_NAMES = listOf("KICK", "SNARE", "HIHAT", "CLAP", "PERC", "RISER", "LASER", "SIREN")
 
 private enum class BottomPanel { NONE, SAMPLER, FX, LIBRARY }
 
@@ -82,17 +87,15 @@ fun MainScreen(engine: AudioEngine, recorder: MixRecorder, activity: Activity) {
     var activeDeckA by remember { mutableStateOf(0) }
     var activeDeckB by remember { mutableStateOf(1) }
     var pendingDeckId by remember { mutableStateOf<Int?>(null) }
+    var pendingPadIndex by remember { mutableStateOf<Int?>(null) }
     var recording by remember { mutableStateOf(false) }
-
-    val toneGen = remember { ToneGenerator(AudioManager.STREAM_MUSIC, 80) }
-    DisposableEffect(Unit) { onDispose { try { toneGen.release() } catch (_: Throwable) {} } }
+    var padRev by remember { mutableLongStateOf(0L) }
 
     val recordLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK && result.data != null) {
-            val ok = recorder.start(result.resultCode, result.data!!)
-            recording = ok
+            recording = recorder.start(result.resultCode, result.data!!)
         }
     }
 
@@ -108,12 +111,21 @@ fun MainScreen(engine: AudioEngine, recorder: MixRecorder, activity: Activity) {
     }
     fun pickFile(id: Int) { pendingDeckId = id; filePicker.launch(arrayOf("video/*", "audio/*")) }
 
+    val samplePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        val idx = pendingPadIndex; pendingPadIndex = null
+        if (uri != null && idx != null) {
+            try { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Throwable) {}
+            SampleStore.assign(context, idx, uri)
+            padRev = System.currentTimeMillis()
+        }
+    }
+    fun pickSampleForPad(idx: Int) { pendingPadIndex = idx; samplePicker.launch(arrayOf("audio/*")) }
+
     fun toggleRecording() {
         if (recording) { recorder.stop(); recording = false }
-        else {
-            val intent = recorder.buildIntent()
-            if (intent != null) recordLauncher.launch(intent)
-        }
+        else { recorder.buildIntent()?.let { recordLauncher.launch(it) } }
     }
 
     LaunchedEffect(Unit) {
@@ -173,7 +185,16 @@ fun MainScreen(engine: AudioEngine, recorder: MixRecorder, activity: Activity) {
         }
         Spacer(Modifier.height(4.dp))
         if (bottomPanel == BottomPanel.SAMPLER) {
-            SamplerDrawer(onPlayTone = { tone -> try { toneGen.startTone(tone, 180) } catch (_: Throwable) {} })
+            SamplerDrawer(
+                context = context, revision = padRev,
+                onPlayPad = { idx, name ->
+                    val assigned = SampleStore.getAssignedUri(context, idx)
+                    if (assigned != null) SampleFilePlayer.play(context, Uri.parse(assigned))
+                    else SampleSynth.play(name)
+                },
+                onAssignPad = { idx -> pickSampleForPad(idx) },
+                onClearPad = { idx -> SampleStore.assign(context, idx, null); padRev = System.currentTimeMillis() }
+            )
             Spacer(Modifier.height(4.dp))
         } else if (bottomPanel == BottomPanel.FX) {
             FxDrawer(engine = engine, deckA = activeDeckA); Spacer(Modifier.height(4.dp))
@@ -237,8 +258,16 @@ private fun VideoStrip(deckA: DeckPlayer, deckB: DeckPlayer, videoCrossfader: Fl
     Box(modifier = Modifier.fillMaxWidth().aspectRatio(21f / 9f)
         .clip(RoundedCornerShape(6.dp)).background(Color.Black)
         .border(1.dp, Neon.CYAN.copy(alpha = 0.55f), RoundedCornerShape(6.dp))) {
-        VideoDeckView(deck = deckA, alpha = 1f, transition = transition, accentColor = Neon.CYAN, modifier = Modifier.fillMaxSize())
-        VideoDeckView(deck = deckB, alpha = 1f - videoCrossfader, transition = transition, accentColor = Neon.MAGENTA, modifier = Modifier.fillMaxSize())
+        VideoDeckView(
+            deck = deckA, progress = videoCrossfader, isIncoming = false,
+            transition = transition, accentColor = Neon.CYAN, showScratchOverlay = true,
+            modifier = Modifier.fillMaxSize()
+        )
+        VideoDeckView(
+            deck = deckB, progress = videoCrossfader, isIncoming = true,
+            transition = transition, accentColor = Neon.MAGENTA, showScratchOverlay = true,
+            modifier = Modifier.fillMaxSize()
+        )
         Box(modifier = Modifier.align(Alignment.TopStart).padding(5.dp)
             .clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.6f))
             .border(1.dp, Neon.CYAN.copy(alpha = 0.7f), RoundedCornerShape(50))
@@ -248,7 +277,7 @@ private fun VideoStrip(deckA: DeckPlayer, deckB: DeckPlayer, videoCrossfader: Fl
         Box(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 4.dp)
             .clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.55f))
             .padding(horizontal = 8.dp, vertical = 2.dp)) {
-            Text("VIDEO MIX", color = Color.White.copy(alpha = 0.85f), fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
+            Text(transition.name, color = Color.White.copy(alpha = 0.9f), fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
         }
         Row(modifier = Modifier.align(Alignment.TopEnd).padding(5.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(if (deckA.isPlaying) Neon.LIVE else Color(0x4000E5FF)))
@@ -268,15 +297,19 @@ private fun VideoControlsRow(videoCrossfader: Float, onValueChange: (Float) -> U
             colors = SliderDefaults.colors(thumbColor = Neon.CYAN,
                 activeTrackColor = accentA.copy(alpha = 0.7f),
                 inactiveTrackColor = accentB.copy(alpha = 0.7f)),
-            modifier = Modifier.weight(1f).height(18.dp))
+            modifier = Modifier.width(120.dp).height(18.dp))
         Text("\u25B6", color = accentB, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-        for (t in VideoTransition.values()) {
-            val sel = t == transition
-            Box(modifier = Modifier.clip(RoundedCornerShape(50))
-                .background(if (sel) Neon.CYAN.copy(alpha = 0.3f) else Neon.BTN_BG)
-                .border(1.dp, Neon.CYAN.copy(alpha = if (sel) 1f else 0.3f), RoundedCornerShape(50))
-                .clickable { onTransitionChange(t) }.padding(horizontal = 6.dp, vertical = 2.dp)) {
-                Text(t.name, color = Neon.CYAN, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+        Row(modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            for (t in VideoTransition.values()) {
+                val sel = t == transition
+                Box(modifier = Modifier.clip(RoundedCornerShape(50))
+                    .background(if (sel) Neon.CYAN.copy(alpha = 0.35f) else Neon.BTN_BG)
+                    .border(if (sel) 1.5.dp else 1.dp, Neon.CYAN.copy(alpha = if (sel) 1f else 0.3f), RoundedCornerShape(50))
+                    .clickable { onTransitionChange(t) }
+                    .padding(horizontal = 8.dp, vertical = 3.dp)) {
+                    Text(t.name, color = Neon.CYAN, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }
@@ -468,23 +501,44 @@ private fun CenterMixer(engine: AudioEngine, audioCrossfader: Float, onAudioCros
 }
 
 @Composable
-private fun SamplerDrawer(onPlayTone: (Int) -> Unit) {
-    val pads = listOf(
-        "KICK" to ToneGenerator.TONE_DTMF_1, "SNARE" to ToneGenerator.TONE_DTMF_2,
-        "HIHAT" to ToneGenerator.TONE_DTMF_3, "CLAP" to ToneGenerator.TONE_DTMF_4,
-        "PERC" to ToneGenerator.TONE_PROP_BEEP, "RISER" to ToneGenerator.TONE_PROP_BEEP2,
-        "LASER" to ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, "SIREN" to ToneGenerator.TONE_CDMA_EMERGENCY_RINGBACK)
-    Row(modifier = Modifier.fillMaxWidth().height(80.dp)
+private fun SamplerDrawer(
+    context: android.content.Context,
+    revision: Long,
+    onPlayPad: (Int, String) -> Unit,
+    onAssignPad: (Int) -> Unit,
+    onClearPad: (Int) -> Unit
+) {
+    Row(modifier = Modifier.fillMaxWidth().height(84.dp)
         .clip(RoundedCornerShape(10.dp)).background(Neon.PANEL_DARK)
         .border(1.dp, Neon.MAGENTA.copy(alpha = 0.5f), RoundedCornerShape(10.dp)).padding(6.dp),
         horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-        pads.forEachIndexed { i, (name, tone) ->
+        for (i in 0 until 8) {
+            val name = PAD_NAMES[i]
             val accent = if (i % 2 == 0) Neon.MAGENTA else Neon.PURPLE
-            Box(modifier = Modifier.weight(1f).fillMaxHeight()
-                .clip(RoundedCornerShape(8.dp)).background(accent.copy(alpha = 0.15f))
-                .border(1.dp, accent.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
-                .clickable { onPlayTone(tone) }, contentAlignment = Alignment.Center) {
-                Text(name, color = accent, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            val assignedUri = remember(i, revision) { SampleStore.getAssignedUri(context, i) }
+            val isCustom = assignedUri != null
+            Box(
+                modifier = Modifier.weight(1f).fillMaxHeight()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(accent.copy(alpha = if (isCustom) 0.25f else 0.12f))
+                    .border(if (isCustom) 2.dp else 1.dp, accent.copy(alpha = if (isCustom) 1f else 0.55f), RoundedCornerShape(8.dp))
+                    .pointerInput(i, revision) {
+                        detectTapGestures(onTap = { onPlayPad(i, name) }, onLongPress = { onAssignPad(i) })
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(name, color = accent, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                    Spacer(Modifier.height(2.dp))
+                    Text(if (isCustom) "CUSTOM" else "SYNTH", color = accent.copy(alpha = 0.75f), fontSize = 6.sp, fontWeight = FontWeight.Bold)
+                }
+                if (isCustom) {
+                    Box(modifier = Modifier.align(Alignment.TopEnd).padding(2.dp)
+                        .size(14.dp).clip(CircleShape).background(Neon.RED.copy(alpha = 0.6f))
+                        .clickable { onClearPad(i) }, contentAlignment = Alignment.Center) {
+                        Text("\u00D7", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
     }
