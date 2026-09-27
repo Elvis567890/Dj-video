@@ -571,6 +571,7 @@ jobs:
           import kotlinx.coroutines.CoroutineScope
           import kotlinx.coroutines.Dispatchers
           import kotlinx.coroutines.Job
+          import kotlinx.coroutines.cancel
           import kotlinx.coroutines.delay
           import kotlinx.coroutines.launch
           class DeckPlayer(val index: Int, context: Context) {
@@ -682,7 +683,8 @@ jobs:
                               player.seekTo((startMs - i * stepBack).coerceAtLeast(0L))
                               scratchRate = -3f; scratchVelocity = -3f; delay(18)
                           }
-                          scratchRate = 1f; scratchVelocity = 0f; scratching = false                          if (wasPlaying) player.play()
+                          scratchRate = 1f; scratchVelocity = 0f; scratching = false
+                          if (wasPlaying) player.play()
                       } catch (_: Throwable) { scratching = false }
                   }
               }
@@ -727,7 +729,7 @@ jobs:
               fun positionMs(): Long = try { player.currentPosition } catch (_: Throwable) { 0L }
               fun durationMs(): Long = try { val d = player.duration; if (d > 0) d else 0L } catch (_: Throwable) { 0L }
               fun release() {
-                  effectJob?.cancel(); loopJob?.cancel(); scope.coroutineContext.cancelChildren()
+                  effectJob?.cancel(); loopJob?.cancel(); scope.cancel()
                   try { player.release() } catch (_: Throwable) {}
                   try { audioSink.release() } catch (_: Throwable) {}
               }
@@ -1107,7 +1109,7 @@ jobs:
           }
           EOF
 
-      - name: UI components part 1
+      - name: UI VideoDeckView
         run: |
           cat > app/src/main/java/com/djpro/mixer/ui/VideoDeckView.kt << 'EOF'
           package com.djpro.mixer.ui
@@ -1125,7 +1127,6 @@ jobs:
           import androidx.compose.ui.geometry.Size
           import androidx.compose.ui.graphics.Color
           import androidx.compose.ui.graphics.graphicsLayer
-          import androidx.compose.ui.platform.LocalContext
           import androidx.compose.ui.viewinterop.AndroidView
           import androidx.media3.ui.AspectRatioFrameLayout
           import androidx.media3.ui.PlayerView
@@ -1175,7 +1176,6 @@ jobs:
                   }
                   VideoTransition.BURN -> { alpha = smoothP; val s = 1f + smoothT * 0.18f; sx = s; sy = s }
               }
-              val ctx = LocalContext.current
               Box(modifier = modifier.clipToBounds()) {
                   AndroidView(
                       modifier = Modifier
@@ -1256,7 +1256,7 @@ jobs:
           }
           EOF
 
-      - name: UI components part 2
+      - name: UI AudioVisualizer
         run: |
           cat > app/src/main/java/com/djpro/mixer/ui/AudioVisualizer.kt << 'EOF'
           package com.djpro.mixer.ui
@@ -1269,8 +1269,7 @@ jobs:
           import androidx.compose.foundation.Canvas
           import androidx.compose.foundation.background
           import androidx.compose.foundation.layout.Box
-          import androidx.compose.foundation.layout.fillMaxSize
-          import androidx.compose.foundation.layout.padding
+          import androidx.compose.foundation.layout.fillMaxSize          import androidx.compose.foundation.layout.padding
           import androidx.compose.foundation.layout.size
           import androidx.compose.foundation.shape.RoundedCornerShape
           import androidx.compose.material3.Text
@@ -1349,6 +1348,8 @@ jobs:
           }
           EOF
 
+      - name: UI MetalJogWheel
+        run: |
           cat > app/src/main/java/com/djpro/mixer/ui/MetalJogWheel.kt << 'EOF'
           package com.djpro.mixer.ui
           import androidx.compose.animation.core.LinearEasing
@@ -1419,6 +1420,8 @@ jobs:
           }
           EOF
 
+      - name: UI BeatgridWaveform
+        run: |
           cat > app/src/main/java/com/djpro/mixer/ui/BeatgridWaveform.kt << 'EOF'
           package com.djpro.mixer.ui
           import androidx.compose.foundation.Canvas
@@ -1458,6 +1461,8 @@ jobs:
           }
           EOF
 
+      - name: UI VolumeFader and MasterVu
+        run: |
           cat > app/src/main/java/com/djpro/mixer/ui/VolumeFader.kt << 'EOF'
           package com.djpro.mixer.ui
           import androidx.compose.foundation.Canvas
@@ -1545,6 +1550,8 @@ jobs:
           }
           EOF
 
+      - name: UI KnobSmall and ScratchOverlay
+        run: |
           cat > app/src/main/java/com/djpro/mixer/ui/KnobSmall.kt << 'EOF'
           package com.djpro.mixer.ui
           import androidx.compose.foundation.Canvas
@@ -1685,6 +1692,8 @@ jobs:
           }
           EOF
 
+      - name: UI DeckStrip and PadGrid
+        run: |
           cat > app/src/main/java/com/djpro/mixer/ui/DeckStrip.kt << 'EOF'
           package com.djpro.mixer.ui
           import androidx.compose.foundation.background
@@ -1760,14 +1769,18 @@ jobs:
 
           cat > app/src/main/java/com/djpro/mixer/ui/PadGrid.kt << 'EOF'
           package com.djpro.mixer.ui
+          import android.content.Context
+          import android.net.Uri
           import androidx.compose.foundation.background
           import androidx.compose.foundation.border
+          import androidx.compose.foundation.clickable
           import androidx.compose.foundation.gestures.detectTapGestures
           import androidx.compose.foundation.layout.*
           import androidx.compose.foundation.shape.CircleShape
           import androidx.compose.foundation.shape.RoundedCornerShape
           import androidx.compose.material3.Text
           import androidx.compose.runtime.Composable
+          import androidx.compose.runtime.remember
           import androidx.compose.ui.Alignment
           import androidx.compose.ui.Modifier
           import androidx.compose.ui.draw.clip
@@ -1777,13 +1790,9 @@ jobs:
           import androidx.compose.ui.unit.dp
           import androidx.compose.ui.unit.sp
           import com.djpro.mixer.Neon
+          import com.djpro.mixer.audio.SampleFilePlayer
           import com.djpro.mixer.audio.SampleStore
           import com.djpro.mixer.audio.SampleSynth
-          import com.djpro.mixer.audio.SampleFilePlayer
-          import android.content.Context
-          import android.net.Uri
-          import androidx.compose.foundation.clickable
-          import androidx.compose.runtime.remember
           enum class PadMode { SAMPLER, HOTCUE, LOOP, STEMS }
           private val PAD_NAMES = listOf("KICK", "SNARE", "HIHAT", "CLAP", "PERC", "RISER", "LASER", "SIREN")
           @Composable
@@ -1864,7 +1873,7 @@ jobs:
           }
           EOF
 
-      - name: MainActivity and MainScreen
+      - name: MainActivity
         run: |
           cat > app/src/main/java/com/djpro/mixer/MainActivity.kt << 'EOF'
           package com.djpro.mixer
@@ -1902,6 +1911,8 @@ jobs:
           }
           EOF
 
+      - name: MainScreen
+        run: |
           cat > app/src/main/java/com/djpro/mixer/MainScreen.kt << 'EOF'
           package com.djpro.mixer
           import android.app.Activity
