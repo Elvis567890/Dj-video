@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ultimateBackground">#04040A</color>
+    <color name="ultimateIconBg">#04040A</color>
+    <color name="ultimateCyan">#00E5FF</color>
+    <color name="ultimateMagenta">#FF2BD6</color>
+</resources>

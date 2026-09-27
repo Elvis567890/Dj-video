@@ -31,9 +31,9 @@ fun VolumeFader(accent: Color, initialValue: Float = 0.75f, onValueChange: (Floa
     }) {
         Canvas(modifier = Modifier.fillMaxHeight().width(28.dp)) {
             val cx = size.width / 2f; val h = size.height
-            drawLine(Color(0xFF2A2A38), Offset(cx, 10f), Offset(cx, h - 10f), 3f, StrokeCap.Round)
+            drawLine(Color(0xFF1E1E28), Offset(cx, 10f), Offset(cx, h - 10f), 3f, StrokeCap.Round)
             val y = h - value * (h - 20f) - 10f
-            drawLine(accent.copy(alpha = 0.55f), Offset(cx, h - 10f), Offset(cx, y), 3f, StrokeCap.Round)
+            drawLine(accent.copy(alpha = 0.65f), Offset(cx, h - 10f), Offset(cx, y), 3f, StrokeCap.Round)
             drawRoundRect(accent, Offset(cx - 12f, y - 6f), Size(24f, 12f), CornerRadius(3f))
             drawRoundRect(Color(0x40FFFFFF), Offset(cx - 12f, y - 6f), Size(24f, 4f), CornerRadius(3f))
             drawRoundRect(Color(0x60000000), Offset(cx - 12f, y - 6f), Size(24f, 12f), CornerRadius(3f), style = Stroke(width = 1f))

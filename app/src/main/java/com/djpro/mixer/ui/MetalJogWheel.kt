@@ -28,11 +28,9 @@ import androidx.compose.ui.unit.Dp
 import kotlin.math.cos
 import kotlin.math.sin
 @Composable
-fun MetalJogWheel(
-    accent: Color, size: Dp, isPlaying: Boolean,
-    onScratchStart: () -> Unit, onScratchMove: (Float) -> Unit, onScratchEnd: () -> Unit,
-    modifier: Modifier = Modifier
-) {
+fun MetalJogWheel(accent: Color, size: Dp, isPlaying: Boolean,
+                  onScratchStart: () -> Unit, onScratchMove: (Float) -> Unit, onScratchEnd: () -> Unit,
+                  modifier: Modifier = Modifier) {
     var userAngle by remember { mutableFloatStateOf(0f) }
     val infinite = rememberInfiniteTransition(label = "jog")
     val spin by infinite.animateFloat(0f, 360f,
@@ -42,29 +40,26 @@ fun MetalJogWheel(
         detectDragGestures(
             onDragStart = { onScratchStart() },
             onDrag = { change: PointerInputChange, drag: Offset ->
-                change.consume()
-                userAngle += drag.y * 0.9f
-                onScratchMove(drag.y)
+                change.consume(); userAngle += drag.y * 0.9f; onScratchMove(drag.y)
             },
-            onDragEnd = { onScratchEnd() },
-            onDragCancel = { onScratchEnd() }
+            onDragEnd = { onScratchEnd() }, onDragCancel = { onScratchEnd() }
         )
     }, contentAlignment = Alignment.Center) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val cx = this.size.width / 2f; val cy = this.size.height / 2f
             val r = this.size.minDimension / 2f; val c = Offset(cx, cy)
-            drawCircle(Brush.radialGradient(listOf(accent.copy(alpha = 0.30f), Color.Transparent), c, r), r, c)
-            drawCircle(Brush.linearGradient(listOf(Color(0xFF2A2A36), Color(0xFF0A0A12), Color(0xFF2A2A36)),
+            drawCircle(Brush.radialGradient(listOf(accent.copy(alpha = 0.35f), Color.Transparent), c, r), r, c)
+            drawCircle(Brush.linearGradient(listOf(Color(0xFF26262E), Color(0xFF08080F), Color(0xFF26262E)),
                 Offset(0f, 0f), Offset(this.size.width, this.size.height)), r * 0.98f, c)
             drawCircle(accent, r * 0.98f, c, style = Stroke(width = 3f))
-            drawCircle(accent.copy(alpha = 0.30f), r * 0.98f, c, style = Stroke(width = 9f))
+            drawCircle(accent.copy(alpha = 0.35f), r * 0.98f, c, style = Stroke(width = 10f))
             drawCircle(Brush.radialGradient(
-                listOf(Color(0xFFE8E8EC), Color(0xFFB8B8C2), Color(0xFF8A8A96), Color(0xFF5A5A66)),
+                listOf(Color(0xFFECECF2), Color(0xFFB6B6C2), Color(0xFF868696), Color(0xFF565666)),
                 Offset(cx - r * 0.20f, cy - r * 0.25f), r * 1.10f), r * 0.78f, c)
             for (g in 1..6) drawCircle(Color(0x30FFFFFF), r * (0.30f + g * 0.075f), c, style = Stroke(width = 0.8f))
             drawCircle(Brush.radialGradient(listOf(Color.Transparent, Color(0x50000000)), c, r * 0.78f), r * 0.78f, c)
             val crossR = r * 0.15f
-            drawCircle(Color(0xFF2A2A38), crossR, c)
+            drawCircle(Color(0xFF1A1A22), crossR, c)
             drawCircle(Color(0xFF5A5A66), crossR, c, style = Stroke(width = 1f))
             drawLine(Color(0xFF9A9AA6), Offset(cx - crossR * 0.6f, cy), Offset(cx + crossR * 0.6f, cy), 1.5f)
             drawLine(Color(0xFF9A9AA6), Offset(cx, cy - crossR * 0.6f), Offset(cx, cy + crossR * 0.6f), 1.5f)

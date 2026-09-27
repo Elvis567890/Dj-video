@@ -20,15 +20,11 @@ import kotlin.math.abs
 import kotlin.math.sin
 import kotlin.random.Random
 
-enum class VideoTransition {
-    CROSSFADE, ZOOM, WIPE, SLIDE, FLIP, GLITCH, STROBE, SPIN, BURN
-}
+enum class VideoTransition { CROSSFADE, ZOOM, WIPE, SLIDE, FLIP, GLITCH, STROBE, SPIN, BURN }
 
 @Composable
 fun VideoDeckView(
-    deck: DeckPlayer,
-    progress: Float,
-    isIncoming: Boolean,
+    deck: DeckPlayer, progress: Float, isIncoming: Boolean,
     transition: VideoTransition = VideoTransition.CROSSFADE,
     accentColor: Color = Color.Cyan,
     showScratchOverlay: Boolean = true,
@@ -36,39 +32,16 @@ fun VideoDeckView(
 ) {
     val p = if (isIncoming) progress else (1f - progress)
     val t = 1f - abs(progress - 0.5f) * 2f
-
     val smoothP by animateFloatAsState(p, tween(80), label = "vp")
     val smoothT by animateFloatAsState(t, tween(120), label = "vt")
-
-    var alpha = smoothP
-    var sx = 1f
-    var sy = 1f
-    var tx = 0f
-    var ty = 0f
-    var rotY = 0f
-    var rotZ = 0f
-    var camDist = 12f
-
+    var alpha = smoothP; var sx = 1f; var sy = 1f; var tx = 0f; var ty = 0f
+    var rotY = 0f; var rotZ = 0f; var camDist = 12f
     when (transition) {
         VideoTransition.CROSSFADE -> { alpha = smoothP }
-        VideoTransition.ZOOM -> {
-            alpha = smoothP
-            val s = 0.80f + 0.20f * smoothP
-            sx = s; sy = s
-        }
-        VideoTransition.WIPE -> {
-            alpha = smoothP
-            if (isIncoming) tx = (1f - progress) * 3000f
-        }
-        VideoTransition.SLIDE -> {
-            alpha = if (p > 0.02f) 1f else 0f
-            tx = if (isIncoming) -(1f - progress) * 3000f else progress * 3000f
-        }
-        VideoTransition.FLIP -> {
-            rotY = if (isIncoming) (progress - 1f) * 180f else progress * 180f
-            alpha = if (abs(rotY) < 89f) 1f else 0f
-            camDist = 8f
-        }
+        VideoTransition.ZOOM -> { alpha = smoothP; val s = 0.80f + 0.20f * smoothP; sx = s; sy = s }
+        VideoTransition.WIPE -> { alpha = smoothP; if (isIncoming) tx = (1f - progress) * 3000f }
+        VideoTransition.SLIDE -> { alpha = if (p > 0.02f) 1f else 0f; tx = if (isIncoming) -(1f - progress) * 3000f else progress * 3000f }
+        VideoTransition.FLIP -> { rotY = if (isIncoming) (progress - 1f) * 180f else progress * 180f; alpha = if (abs(rotY) < 89f) 1f else 0f; camDist = 8f }
         VideoTransition.GLITCH -> {
             alpha = smoothP
             val jitterAmp = smoothT * 32f
@@ -79,48 +52,28 @@ fun VideoDeckView(
             sy = 1f + smoothT * 0.04f * (rnd.nextFloat() - 0.5f)
         }
         VideoTransition.STROBE -> {
-            val flick = if (smoothT > 0.02f) {
-                val s = sin(progress * 95f)
-                if (s > 0f) 1f else 0.15f
-            } else 1f
+            val flick = if (smoothT > 0.02f) { val s = sin(progress * 95f); if (s > 0f) 1f else 0.15f } else 1f
             alpha = smoothP * flick
         }
         VideoTransition.SPIN -> {
             alpha = smoothP
             val dir = if (isIncoming) 1f else -1f
             rotZ = (1f - smoothP) * 360f * dir
-            val s = 0.55f + 0.45f * smoothP
-            sx = s; sy = s
+            val s = 0.55f + 0.45f * smoothP; sx = s; sy = s
         }
-        VideoTransition.BURN -> {
-            alpha = smoothP
-            val s = 1f + smoothT * 0.18f
-            sx = s; sy = s
-        }
+        VideoTransition.BURN -> { alpha = smoothP; val s = 1f + smoothT * 0.18f; sx = s; sy = s }
     }
-
     Box(modifier = modifier.clipToBounds()) {
         AndroidView(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    this.alpha = alpha.coerceIn(0f, 1f)
-                    scaleX = sx
-                    scaleY = sy
-                    translationX = tx
-                    translationY = ty
-                    rotationY = rotY
-                    rotationZ = rotZ
-                    cameraDistance = camDist * density
-                },
-            factory = { ctx ->
-                TextureView(ctx).apply {
-                    isOpaque = true
-                    deck.player.setVideoTextureView(this)
-                }
-            }
+            modifier = Modifier.fillMaxSize().graphicsLayer {
+                this.alpha = alpha.coerceIn(0f, 1f)
+                scaleX = sx; scaleY = sy
+                translationX = tx; translationY = ty
+                rotationY = rotY; rotationZ = rotZ
+                cameraDistance = camDist * density
+            },
+            factory = { ctx -> TextureView(ctx).apply { isOpaque = true; deck.player.setVideoTextureView(this) } }
         )
-
         if (smoothT > 0.05f && alpha > 0.15f) {
             when (transition) {
                 VideoTransition.GLITCH -> GlitchOverlay(accentColor, smoothT, progress)
@@ -129,17 +82,9 @@ fun VideoDeckView(
                 else -> {}
             }
         }
-
-        val scratching = deck.scratching
-        if (showScratchOverlay && scratching && alpha > 0.3f) {
-            ScratchOverlay(
-                accent = accentColor,
-                rate = deck.scratchRate,
-                velocity = deck.scratchVelocity,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer { this.alpha = alpha.coerceIn(0f, 1f) }
-            )
+        if (showScratchOverlay && deck.scratching && alpha > 0.3f) {
+            ScratchOverlay(accent = accentColor, rate = deck.scratchRate, velocity = deck.scratchVelocity,
+                modifier = Modifier.fillMaxSize().graphicsLayer { this.alpha = alpha.coerceIn(0f, 1f) })
         }
     }
 }
@@ -184,7 +129,6 @@ private fun BurnOverlay(accent: Color, intensity: Float) {
     Canvas(modifier = Modifier.fillMaxSize()) {
         val w = size.width; val h = size.height
         drawRect(color = Color(0xFFFF6A00).copy(alpha = 0.18f * intensity))
-        drawRect(color = Color.White.copy(alpha = 0.35f * intensity),
-            topLeft = Offset(0f, h * 0.45f), size = Size(w, h * 0.1f))
+        drawRect(color = Color.White.copy(alpha = 0.35f * intensity), topLeft = Offset(0f, h * 0.45f), size = Size(w, h * 0.1f))
     }
 }

@@ -6,11 +6,11 @@ android {
     namespace = "com.djpro.mixer"
     compileSdk = 34
     defaultConfig {
-        applicationId = "com.djpro.mixer"
+        applicationId = "com.ultimate.dj"
         minSdk = 26
         targetSdk = 34
-        versionCode = 17
-        versionName = "6.3.0"
+        versionCode = 21
+        versionName = "1.0.1"
     }
     buildTypes { release { isMinifyEnabled = false } }
     compileOptions {
@@ -35,6 +35,7 @@ android {
 }
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
     implementation("androidx.activity:activity-compose:1.9.1")

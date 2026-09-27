@@ -4,8 +4,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.Tracks
 import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
@@ -39,6 +41,7 @@ class DeckPlayer(val index: Int, context: Context) {
     }
     var isLoaded by mutableStateOf(false); private set
     var isPlaying by mutableStateOf(false); private set
+    var hasVideo by mutableStateOf(false); private set
     var scratching by mutableStateOf(false); private set
     var scratchRate by mutableFloatStateOf(1f); private set
     var scratchVelocity by mutableFloatStateOf(0f); private set
@@ -56,8 +59,30 @@ class DeckPlayer(val index: Int, context: Context) {
     private var effectJob: Job? = null
     private var loopJob: Job? = null
 
+    init {
+        player.addListener(object : Player.Listener {
+            override fun onTracksChanged(tracks: Tracks) {
+                var foundVideo = false
+                for (group in tracks.groups) {
+                    if (group.type == C.TRACK_TYPE_VIDEO && group.isSupported) {
+                        foundVideo = true
+                        break
+                    }
+                }
+                hasVideo = foundVideo
+            }
+            override fun onIsPlayingChanged(isPlayingNow: Boolean) {
+                isPlaying = isPlayingNow
+            }
+            override fun onPlaybackStateChanged(state: Int) {
+                if (state == Player.STATE_ENDED) isPlaying = false
+            }
+        })
+    }
+
     fun load(uri: String, displayName: String = "Loaded") {
         try {
+            hasVideo = false
             player.setMediaItem(MediaItem.fromUri(uri)); player.prepare()
             isLoaded = true; bpm = 120f + (0..16).random(); loadedName = displayName
         } catch (_: Throwable) { isLoaded = false }

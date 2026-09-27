@@ -36,7 +36,7 @@ fun MasterVu(playing: Boolean, modifier: Modifier = Modifier) {
                 t > 0.55f -> Color(0xFF9CFF2B)
                 else -> Color(0xFF00E5FF)
             }
-            drawRect(color = color.copy(alpha = if (lit) 1f else 0.12f), topLeft = Offset(0f, y), size = Size(w, segH))
+            drawRect(color = color.copy(alpha = if (lit) 1f else 0.10f), topLeft = Offset(0f, y), size = Size(w, segH))
         }
     }
 }

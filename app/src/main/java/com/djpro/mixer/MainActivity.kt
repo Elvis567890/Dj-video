@@ -7,12 +7,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.djpro.mixer.audio.AudioEngine
 import com.djpro.mixer.video.MixRecorder
 class MainActivity : ComponentActivity() {
     private lateinit var engine: AudioEngine
     private lateinit var recorder: MixRecorder
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         engine = AudioEngine(this)
         recorder = MixRecorder(this)

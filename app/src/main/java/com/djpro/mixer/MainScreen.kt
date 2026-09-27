@@ -57,6 +57,7 @@ import com.djpro.mixer.audio.DeckPlayer
 import com.djpro.mixer.audio.SampleFilePlayer
 import com.djpro.mixer.audio.SampleStore
 import com.djpro.mixer.audio.SampleSynth
+import com.djpro.mixer.ui.AudioVisualizer
 import com.djpro.mixer.ui.BeatgridWaveform
 import com.djpro.mixer.ui.KnobSmall
 import com.djpro.mixer.ui.MasterVu
@@ -117,8 +118,7 @@ fun MainScreen(engine: AudioEngine, recorder: MixRecorder, activity: Activity) {
         val idx = pendingPadIndex; pendingPadIndex = null
         if (uri != null && idx != null) {
             try { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Throwable) {}
-            SampleStore.assign(context, idx, uri)
-            padRev = System.currentTimeMillis()
+            SampleStore.assign(context, idx, uri); padRev = System.currentTimeMillis()
         }
     }
     fun pickSampleForPad(idx: Int) { pendingPadIndex = idx; samplePicker.launch(arrayOf("audio/*")) }
@@ -143,172 +143,204 @@ fun MainScreen(engine: AudioEngine, recorder: MixRecorder, activity: Activity) {
 
     Column(modifier = Modifier.fillMaxSize()
         .background(if (clubMode) Neon.CLUB_BG else Neon.BG)
-        .padding(horizontal = 6.dp, vertical = 4.dp)) {
-        TopBar(bpmMaster = bpmMaster, clubMode = clubMode, onClubToggle = { clubMode = !clubMode }, recording = recording, onRecordToggle = { toggleRecording() })
-        Spacer(Modifier.height(3.dp))
-        VideoStrip(deckA = deckA, deckB = deckB, videoCrossfader = videoCrossfader, transition = videoTransition)
-        Spacer(Modifier.height(2.dp))
-        VideoControlsRow(videoCrossfader = videoCrossfader, onValueChange = { videoCrossfader = it },
-            accentA = accentA, accentB = accentB, transition = videoTransition, onTransitionChange = { videoTransition = it })
+        .padding(horizontal = 8.dp, vertical = 6.dp)) {
+
+        TopBar(recording, clubMode, { toggleRecording() }, { clubMode = !clubMode })
+
+        Spacer(Modifier.height(6.dp))
+        VideoStrip(deckA, deckB, videoCrossfader, videoTransition)
         Spacer(Modifier.height(4.dp))
-        Row(modifier = Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        VideoControlsRow(videoCrossfader, { videoCrossfader = it }, accentA, accentB, videoTransition, { videoTransition = it })
+        Spacer(Modifier.height(8.dp))
+
+        Row(modifier = Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             DeckPanel(deck = deckA, accent = accentA, label = "DECK A",
                 onPickFile = { pickFile(activeDeckA) }, onPlay = { engine.togglePlay(activeDeckA) },
                 onSync = { engine.syncBpm(activeDeckB, activeDeckA) }, onCue = { engine.setCue(activeDeckA, 0) },
-                onJumpCue = { slot -> engine.jumpCue(activeDeckA, slot) },
-                onSetCue = { slot -> engine.setCue(activeDeckA, slot) },
-                onToggleLoop = { beats -> engine.toggleLoop(activeDeckA, beats) },
+                onJumpCue = { s -> engine.jumpCue(activeDeckA, s) }, onSetCue = { s -> engine.setCue(activeDeckA, s) },
+                onToggleLoop = { b -> engine.toggleLoop(activeDeckA, b) },
                 onSpinback = { engine.spinback(activeDeckA) }, onBrake = { engine.brake(activeDeckA) },
                 onScratchStart = { engine.beginScratch(activeDeckA) },
                 onScratchMove = { dy -> engine.scratchMove(activeDeckA, dy) },
                 onScratchEnd = { engine.endScratch(activeDeckA) },
-                onEqChange = { low, mid, high -> engine.setEq(activeDeckA, low, mid, high) },
-                onStemsChange = { drm, bas, oth -> engine.setStemMutes(drm, bas, oth) },
+                onEqChange = { l, m, h -> engine.setEq(activeDeckA, l, m, h) },
+                onStemsChange = { d, b, o -> engine.setStemMutes(d, b, o) },
                 modifier = Modifier.weight(1f).fillMaxHeight())
-            CenterMixer(engine = engine, audioCrossfader = audioCrossfader,
-                onAudioCrossfaderChange = { audioCrossfader = it; engine.setCrossfader(it) },
-                crossMode = crossMode, onCrossModeChange = { crossMode = it; engine.setCrossfaderMode(it) },
-                anyPlaying = anyPlaying, modifier = Modifier.width(160.dp).fillMaxHeight())
+            CenterMixer(engine, audioCrossfader, { audioCrossfader = it; engine.setCrossfader(it) },
+                crossMode, { crossMode = it; engine.setCrossfaderMode(it) }, anyPlaying, bpmMaster,
+                Modifier.width(180.dp).fillMaxHeight())
             DeckPanel(deck = deckB, accent = accentB, label = "DECK B",
                 onPickFile = { pickFile(activeDeckB) }, onPlay = { engine.togglePlay(activeDeckB) },
                 onSync = { engine.syncBpm(activeDeckA, activeDeckB) }, onCue = { engine.setCue(activeDeckB, 0) },
-                onJumpCue = { slot -> engine.jumpCue(activeDeckB, slot) },
-                onSetCue = { slot -> engine.setCue(activeDeckB, slot) },
-                onToggleLoop = { beats -> engine.toggleLoop(activeDeckB, beats) },
+                onJumpCue = { s -> engine.jumpCue(activeDeckB, s) }, onSetCue = { s -> engine.setCue(activeDeckB, s) },
+                onToggleLoop = { b -> engine.toggleLoop(activeDeckB, b) },
                 onSpinback = { engine.spinback(activeDeckB) }, onBrake = { engine.brake(activeDeckB) },
                 onScratchStart = { engine.beginScratch(activeDeckB) },
                 onScratchMove = { dy -> engine.scratchMove(activeDeckB, dy) },
                 onScratchEnd = { engine.endScratch(activeDeckB) },
-                onEqChange = { low, mid, high -> engine.setEq(activeDeckB, low, mid, high) },
-                onStemsChange = { drm, bas, oth -> engine.setStemMutes(drm, bas, oth) },
+                onEqChange = { l, m, h -> engine.setEq(activeDeckB, l, m, h) },
+                onStemsChange = { d, b, o -> engine.setStemMutes(d, b, o) },
                 modifier = Modifier.weight(1f).fillMaxHeight())
         }
-        Spacer(Modifier.height(4.dp))
+
+        Spacer(Modifier.height(6.dp))
+
         if (bottomPanel == BottomPanel.SAMPLER) {
-            SamplerDrawer(
-                context = context, revision = padRev,
+            SamplerDrawer(context, padRev,
                 onPlayPad = { idx, name ->
-                    val assigned = SampleStore.getAssignedUri(context, idx)
-                    if (assigned != null) SampleFilePlayer.play(context, Uri.parse(assigned))
+                    val a = SampleStore.getAssignedUri(context, idx)
+                    if (a != null) SampleFilePlayer.play(context, Uri.parse(a))
                     else SampleSynth.play(name)
                 },
                 onAssignPad = { idx -> pickSampleForPad(idx) },
-                onClearPad = { idx -> SampleStore.assign(context, idx, null); padRev = System.currentTimeMillis() }
-            )
-            Spacer(Modifier.height(4.dp))
+                onClearPad = { idx -> SampleStore.assign(context, idx, null); padRev = System.currentTimeMillis() })
+            Spacer(Modifier.height(6.dp))
         } else if (bottomPanel == BottomPanel.FX) {
-            FxDrawer(engine = engine, deckA = activeDeckA); Spacer(Modifier.height(4.dp))
+            FxDrawer(engine, activeDeckA); Spacer(Modifier.height(6.dp))
         } else if (bottomPanel == BottomPanel.LIBRARY) {
             LibraryDrawer(
-                onPickForA = { pickFile(activeDeckA) }, onPickForB = { pickFile(activeDeckB) },
-                onLoadSampleA = { engine.loadDeck(activeDeckA, SAMPLE_VIDEO_1, "Sample A") },
-                onLoadSampleB = { engine.loadDeck(activeDeckB, SAMPLE_VIDEO_2, "Sample B") })
-            Spacer(Modifier.height(4.dp))
+                { pickFile(activeDeckA) }, { pickFile(activeDeckB) },
+                { engine.loadDeck(activeDeckA, SAMPLE_VIDEO_1, "Sample A") },
+                { engine.loadDeck(activeDeckB, SAMPLE_VIDEO_2, "Sample B") })
+            Spacer(Modifier.height(6.dp))
         }
-        BottomBar(activePanel = bottomPanel,
-            onTogglePanel = { p -> bottomPanel = if (bottomPanel == p) BottomPanel.NONE else p },
-            activeDeckA = activeDeckA, activeDeckB = activeDeckB,
-            onSwapA = { id -> engine.swapToA(id); activeDeckA = id },
-            onSwapB = { id -> engine.swapToB(id); activeDeckB = id },
-            onLoadSample = { id -> val url = if (id % 2 == 0) SAMPLE_VIDEO_1 else SAMPLE_VIDEO_2; engine.loadDeck(id, url, "Sample ${id + 1}") })
+
+        BottomBar(bottomPanel, { p -> bottomPanel = if (bottomPanel == p) BottomPanel.NONE else p },
+            activeDeckA, activeDeckB,
+            { id -> engine.swapToA(id); activeDeckA = id },
+            { id -> engine.swapToB(id); activeDeckB = id },
+            { id -> val url = if (id % 2 == 0) SAMPLE_VIDEO_1 else SAMPLE_VIDEO_2; engine.loadDeck(id, url, "Sample ${id + 1}") })
     }
 }
 
 @Composable
-private fun TopBar(bpmMaster: Float, clubMode: Boolean, onClubToggle: () -> Unit, recording: Boolean, onRecordToggle: () -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(26.dp).clip(CircleShape).background(Neon.PANEL)
-                .border(1.dp, Neon.CYAN.copy(alpha = 0.5f), CircleShape), contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.Menu, "menu", tint = Neon.CYAN, modifier = Modifier.size(15.dp))
-            }
-            Spacer(Modifier.width(8.dp))
-            Text("DJ PRO MIXER", color = Neon.CYAN, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 4.sp)
+private fun TopBar(recording: Boolean, clubMode: Boolean, onRecord: () -> Unit, onClub: () -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Box(modifier = Modifier.size(34.dp).clip(CircleShape).background(Neon.PANEL)
+            .border(1.dp, Neon.CYAN.copy(alpha = 0.55f), CircleShape), contentAlignment = Alignment.Center) {
+            Icon(Icons.Filled.Menu, "menu", tint = Neon.CYAN, modifier = Modifier.size(18.dp))
         }
-        Text("BPM MASTER  ${"%.1f".format(bpmMaster)}", color = Neon.TEXT, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Text("ULTIMATE", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Black, letterSpacing = 8.sp)
+            Text("PRO DJ STUDIO", color = Neon.CYAN.copy(alpha = 0.7f), fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 4.sp)
+        }
+        Spacer(Modifier.weight(1f))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.clip(RoundedCornerShape(50))
-                .background(if (recording) Neon.RED.copy(alpha = 0.5f) else Neon.PANEL)
-                .border(1.dp, Neon.RED.copy(alpha = 0.7f), RoundedCornerShape(50))
-                .clickable { onRecordToggle() }.padding(horizontal = 8.dp, vertical = 4.dp)) {
+                .background(if (recording) Neon.RED.copy(alpha = 0.35f) else Neon.PANEL)
+                .border(1.dp, Neon.RED.copy(alpha = 0.75f), RoundedCornerShape(50))
+                .clickable { onRecord() }.padding(horizontal = 12.dp, vertical = 5.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(Neon.RED))
-                    Spacer(Modifier.width(4.dp))
-                    Text(if (recording) "STOP" else "REC", color = Neon.RED, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.width(6.dp))
+                    Text(if (recording) "STOP" else "REC", color = Neon.RED, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                 }
             }
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(8.dp))
             Box(modifier = Modifier.clip(RoundedCornerShape(50))
-                .background(if (clubMode) Neon.CYAN.copy(alpha = 0.3f) else Neon.PANEL)
-                .border(1.dp, Neon.CYAN.copy(alpha = 0.5f), RoundedCornerShape(50))
-                .clickable { onClubToggle() }.padding(horizontal = 8.dp, vertical = 4.dp)) {
-                Text(if (clubMode) "CLUB ON" else "CLUB", color = Neon.CYAN, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                .background(if (clubMode) Neon.CYAN.copy(alpha = 0.25f) else Neon.PANEL)
+                .border(1.dp, Neon.CYAN.copy(alpha = 0.55f), RoundedCornerShape(50))
+                .clickable { onClub() }.padding(horizontal = 12.dp, vertical = 5.dp)) {
+                Text(if (clubMode) "CLUB ON" else "CLUB", color = Neon.CYAN, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
             }
-            Spacer(Modifier.width(6.dp))
-            Box(modifier = Modifier.size(26.dp).clip(CircleShape).background(Neon.PANEL)
-                .border(1.dp, Neon.CYAN.copy(alpha = 0.5f), CircleShape), contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.Settings, "settings", tint = Neon.CYAN, modifier = Modifier.size(15.dp))
+            Spacer(Modifier.width(8.dp))
+            Box(modifier = Modifier.size(34.dp).clip(CircleShape).background(Neon.PANEL)
+                .border(1.dp, Neon.CYAN.copy(alpha = 0.55f), CircleShape), contentAlignment = Alignment.Center) {
+                Icon(Icons.Filled.Settings, "settings", tint = Neon.CYAN, modifier = Modifier.size(18.dp))
             }
         }
     }
 }
 
+// ================== VIDEO / AUDIO STRIP ==================
 @Composable
 private fun VideoStrip(deckA: DeckPlayer, deckB: DeckPlayer, videoCrossfader: Float, transition: VideoTransition) {
     Box(modifier = Modifier.fillMaxWidth().aspectRatio(21f / 9f)
-        .clip(RoundedCornerShape(6.dp)).background(Color.Black)
-        .border(1.dp, Neon.CYAN.copy(alpha = 0.55f), RoundedCornerShape(6.dp))) {
-        VideoDeckView(
-            deck = deckA, progress = videoCrossfader, isIncoming = false,
-            transition = transition, accentColor = Neon.CYAN, showScratchOverlay = true,
-            modifier = Modifier.fillMaxSize()
-        )
-        VideoDeckView(
-            deck = deckB, progress = videoCrossfader, isIncoming = true,
-            transition = transition, accentColor = Neon.MAGENTA, showScratchOverlay = true,
-            modifier = Modifier.fillMaxSize()
-        )
-        Box(modifier = Modifier.align(Alignment.TopStart).padding(5.dp)
-            .clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.6f))
-            .border(1.dp, Neon.CYAN.copy(alpha = 0.7f), RoundedCornerShape(50))
-            .padding(horizontal = 8.dp, vertical = 2.dp)) {
-            Text("VIDEO", color = Neon.CYAN, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+        .clip(RoundedCornerShape(10.dp)).background(Color.Black)
+        .border(1.dp, Neon.BORDER_SOFT, RoundedCornerShape(10.dp))) {
+
+        // Deck A: video if hasVideo, else visualizer
+        if (deckA.hasVideo) {
+            VideoDeckView(deckA, videoCrossfader, false, transition, Neon.CYAN, true, Modifier.fillMaxSize())
+        } else {
+            AudioVisualizer(
+                accent = Neon.CYAN,
+                isPlaying = deckA.isPlaying,
+                trackName = deckA.loadedName,
+                modifier = Modifier.fillMaxSize()
+            )
         }
-        Box(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 4.dp)
+
+        // Deck B: video if hasVideo, else visualizer (with alpha from crossfader)
+        if (deckB.hasVideo) {
+            VideoDeckView(deckB, videoCrossfader, true, transition, Neon.MAGENTA, true, Modifier.fillMaxSize())
+        } else if (deckB.isLoaded) {
+            Box(modifier = Modifier.fillMaxSize().graphicsLayer {
+                alpha = (1f - videoCrossfader).coerceIn(0f, 1f)
+            }) {
+                AudioVisualizer(
+                    accent = Neon.MAGENTA,
+                    isPlaying = deckB.isPlaying,
+                    trackName = deckB.loadedName,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+
+        // Top-left badge
+        Box(modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
             .clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.55f))
-            .padding(horizontal = 8.dp, vertical = 2.dp)) {
-            Text(transition.name, color = Color.White.copy(alpha = 0.9f), fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
+            .border(1.dp, Neon.CYAN.copy(alpha = 0.7f), RoundedCornerShape(50))
+            .padding(horizontal = 10.dp, vertical = 3.dp)) {
+            Text("MIX", color = Neon.CYAN, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
         }
-        Row(modifier = Modifier.align(Alignment.TopEnd).padding(5.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(if (deckA.isPlaying) Neon.LIVE else Color(0x4000E5FF)))
-            Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(if (deckB.isPlaying) Neon.LIVE else Color(0x40FF2BD6)))
+
+        // Bottom-centre: transition name if both have video, else mode text
+        val modeText = when {
+            deckA.hasVideo && deckB.hasVideo -> transition.name
+            !deckA.hasVideo && !deckB.hasVideo -> "AUDIO MIX"
+            deckA.hasVideo || deckB.hasVideo -> "VIDEO \u2022 AUDIO"
+            else -> "READY"
+        }
+        Box(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp)
+            .clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.6f))
+            .padding(horizontal = 12.dp, vertical = 3.dp)) {
+            Text(modeText, color = Color.White.copy(alpha = 0.95f), fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
+        }
+
+        // LIVE dots top-right
+        Row(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            Box(modifier = Modifier.size(8.dp).clip(CircleShape)
+                .background(if (deckA.isPlaying) Neon.LIVE else Color(0x4000E5FF)))
+            Box(modifier = Modifier.size(8.dp).clip(CircleShape)
+                .background(if (deckB.isPlaying) Neon.LIVE else Color(0x40FF2BD6)))
         }
     }
 }
 
 @Composable
-private fun VideoControlsRow(videoCrossfader: Float, onValueChange: (Float) -> Unit,
-                             accentA: Color, accentB: Color,
-                             transition: VideoTransition, onTransitionChange: (VideoTransition) -> Unit) {
+private fun VideoControlsRow(vcf: Float, onChange: (Float) -> Unit,
+                             a: Color, b: Color,
+                             transition: VideoTransition, onTransition: (VideoTransition) -> Unit) {
     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("\u25C0", color = accentA, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-        Slider(value = videoCrossfader, onValueChange = onValueChange,
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("\u25C0", color = a, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Slider(value = vcf, onValueChange = onChange,
             colors = SliderDefaults.colors(thumbColor = Neon.CYAN,
-                activeTrackColor = accentA.copy(alpha = 0.7f),
-                inactiveTrackColor = accentB.copy(alpha = 0.7f)),
+                activeTrackColor = a.copy(alpha = 0.8f),
+                inactiveTrackColor = b.copy(alpha = 0.8f)),
             modifier = Modifier.width(120.dp).height(18.dp))
-        Text("\u25B6", color = accentB, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Text("\u25B6", color = b, fontSize = 11.sp, fontWeight = FontWeight.Bold)
         Row(modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            horizontalArrangement = Arrangement.spacedBy(5.dp)) {
             for (t in VideoTransition.values()) {
                 val sel = t == transition
                 Box(modifier = Modifier.clip(RoundedCornerShape(50))
-                    .background(if (sel) Neon.CYAN.copy(alpha = 0.35f) else Neon.BTN_BG)
+                    .background(if (sel) Neon.CYAN.copy(alpha = 0.3f) else Neon.BTN_BG)
                     .border(if (sel) 1.5.dp else 1.dp, Neon.CYAN.copy(alpha = if (sel) 1f else 0.3f), RoundedCornerShape(50))
-                    .clickable { onTransitionChange(t) }
-                    .padding(horizontal = 8.dp, vertical = 3.dp)) {
-                    Text(t.name, color = Neon.CYAN, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+                    .clickable { onTransition(t) }.padding(horizontal = 9.dp, vertical = 3.dp)) {
+                    Text(t.name, color = if (sel) Neon.CYAN else Neon.TEXT_DIM, fontSize = 7.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -338,59 +370,73 @@ private fun DeckPanel(
     val isPlaying = deck.isPlaying
     val scratching = deck.scratching
     val speed = deck.currentSpeed()
+    val kindTag = if (deck.hasVideo) "VIDEO" else if (deck.isLoaded) "AUDIO" else ""
 
     LaunchedEffect(deck) { while (true) { positionMs = deck.positionMs(); durationMs = deck.durationMs(); delay(400) } }
 
-    Column(modifier = modifier.clip(RoundedCornerShape(10.dp))
+    Column(modifier = modifier.clip(RoundedCornerShape(14.dp))
         .background(if (scratching) accent.copy(alpha = 0.08f) else Neon.PANEL)
-        .border(if (scratching) 2.dp else 1.dp, accent.copy(alpha = if (scratching) 1f else 0.55f), RoundedCornerShape(10.dp))
-        .padding(6.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        .border(if (scratching) 2.dp else 1.dp, accent.copy(alpha = if (scratching) 1f else 0.5f), RoundedCornerShape(14.dp))
+        .padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(label, color = accent, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                Spacer(Modifier.width(5.dp))
-                Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(if (scratching) Neon.YELLOW else accent))
+                Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(if (scratching) Neon.YELLOW else accent))
+                Spacer(Modifier.width(6.dp))
+                Text(label, color = accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
+                if (kindTag.isNotEmpty()) {
+                    Spacer(Modifier.width(8.dp))
+                    Box(modifier = Modifier.clip(RoundedCornerShape(50))
+                        .background(accent.copy(alpha = 0.15f))
+                        .border(1.dp, accent.copy(alpha = 0.5f), RoundedCornerShape(50))
+                        .padding(horizontal = 6.dp, vertical = 1.dp)) {
+                        Text(kindTag, color = accent, fontSize = 7.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                    }
+                }
             }
-            Text(text = when { scratching -> "SCR \u00D7${"%.2f".format(deck.scratchRate)}"; isPlaying -> "LIVE"; else -> "READY" },
-                color = when { scratching -> Neon.YELLOW; isPlaying -> Neon.LIVE; else -> Neon.TEXT_DIM },
-                fontSize = 8.sp, fontWeight = FontWeight.Bold)
+            Text(when { scratching -> "SCR \u00D7${"%.2f".format(deck.scratchRate)}"; isPlaying -> "LIVE"; else -> "READY" },
+                color = when { scratching -> Neon.YELLOW; isPlaying -> Neon.LIVE; else -> Neon.TEXT_FAINT },
+                fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
         }
-        Text(text = if (deck.loadedName.isNotEmpty()) deck.loadedName else "Tap LOAD to pick",
-            color = Neon.TEXT, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(if (deck.loadedName.isNotEmpty()) deck.loadedName else "Tap LOAD to pick a track",
+            color = Neon.TEXT, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("${fmt(positionMs)} / ${fmt(if (durationMs > 0) durationMs else 0L)}",
-                color = accent.copy(alpha = 0.8f), fontSize = 8.sp, fontWeight = FontWeight.Bold)
-            Text("BPM ${"%.1f".format(deck.bpm)}  |  ${"%.0f".format(speed * 100)}%",
-                color = accent.copy(alpha = 0.7f), fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                color = accent.copy(alpha = 0.85f), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            Text("BPM ${"%.1f".format(deck.bpm)} \u2022 ${"%.0f".format(speed * 100)}%",
+                color = accent.copy(alpha = 0.75f), fontSize = 9.sp, fontWeight = FontWeight.Bold)
         }
+
         BeatgridWaveform(accent = accent, seed = deck.index * 31 + 7, barCount = 100)
+
         Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-            MetalJogWheel(accent = accent, size = 100.dp, isPlaying = isPlaying,
+            MetalJogWheel(accent = accent, size = 108.dp, isPlaying = isPlaying,
                 onScratchStart = onScratchStart, onScratchMove = onScratchMove, onScratchEnd = onScratchEnd)
         }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             PillBtn("SYNC", accent, false, onSync, Modifier.weight(1f))
             PillBtn("CUE", accent, false, onCue, Modifier.weight(1f))
             PillBtn("\u25B6 PLAY", accent, isPlaying, onPlay, Modifier.weight(1.4f))
         }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             for (b in intArrayOf(1, 2, 4, 8, 16)) {
                 PillBtn("$b", accent, deck.loopActive && deck.loopBeats == b, { onToggleLoop(b) }, Modifier.weight(1f))
             }
         }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             for (i in 0..3) {
                 val has = deck.cuePoints.getOrNull(i) ?: -1L >= 0
                 CuePad(i, accent, has, { onSetCue(i) }, { onJumpCue(i) }, Modifier.weight(1f))
             }
         }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             for (i in 4..7) {
                 val has = deck.cuePoints.getOrNull(i) ?: -1L >= 0
                 CuePad(i, accent, has, { onSetCue(i) }, { onJumpCue(i) }, Modifier.weight(1f))
             }
         }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             StemBtn("VOX", accent, false, {}, Modifier.weight(1f))
             StemBtn("DRM", accent, drmMute, { drmMute = !drmMute; onStemsChange(drmMute, basMute, othMute) }, Modifier.weight(1f))
             StemBtn("BAS", accent, basMute, { basMute = !basMute; onStemsChange(drmMute, basMute, othMute) }, Modifier.weight(1f))
@@ -407,7 +453,7 @@ private fun DeckPanel(
                 KnobSmall("LOW", accent, lowVal, onValueChange = { lowVal = it; onEqChange(it, midVal, hiVal) })
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(modifier = Modifier.size(34.dp).clip(CircleShape)
+                Box(modifier = Modifier.size(36.dp).clip(CircleShape)
                     .background(if (killActive) accent.copy(alpha = 0.4f) else Neon.BTN_BG)
                     .border(1.5.dp, accent.copy(alpha = if (killActive) 1f else 0.5f), CircleShape)
                     .clickable {
@@ -415,11 +461,11 @@ private fun DeckPanel(
                         if (killActive) onEqChange(-26f, -26f, -26f)
                         else { lowVal = 0f; midVal = 0f; hiVal = 0f; onEqChange(0f, 0f, 0f) }
                     }, contentAlignment = Alignment.Center) {
-                    Text("KILL", color = accent, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+                    Text("KILL", color = accent, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             PillBtn("SPIN", accent, false, onSpinback, Modifier.weight(1f))
             PillBtn("BRAKE", accent, false, onBrake, Modifier.weight(1f))
             PillBtn("LOAD", accent, false, onPickFile, Modifier.weight(1.2f))
@@ -429,10 +475,10 @@ private fun DeckPanel(
 
 @Composable
 private fun CuePad(index: Int, accent: Color, hasCue: Boolean, onSet: () -> Unit, onJump: () -> Unit, modifier: Modifier = Modifier) {
-    Box(modifier = modifier.clip(RoundedCornerShape(4.dp))
+    Box(modifier = modifier.clip(RoundedCornerShape(6.dp))
         .background(if (hasCue) accent.copy(alpha = 0.35f) else Neon.BTN_BG)
-        .border(1.dp, accent.copy(alpha = if (hasCue) 1f else 0.35f), RoundedCornerShape(4.dp))
-        .clickable { if (hasCue) onJump() else onSet() }.padding(vertical = 5.dp),
+        .border(1.dp, accent.copy(alpha = if (hasCue) 1f else 0.35f), RoundedCornerShape(6.dp))
+        .clickable { if (hasCue) onJump() else onSet() }.padding(vertical = 6.dp),
         contentAlignment = Alignment.Center) {
         Text(if (hasCue) "C${index + 1}" else "+${index + 1}", color = accent, fontSize = 7.sp, fontWeight = FontWeight.Bold)
     }
@@ -440,93 +486,87 @@ private fun CuePad(index: Int, accent: Color, hasCue: Boolean, onSet: () -> Unit
 
 @Composable
 private fun StemBtn(label: String, accent: Color, active: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Box(modifier = modifier.clip(RoundedCornerShape(4.dp))
+    Box(modifier = modifier.clip(RoundedCornerShape(6.dp))
         .background(if (active) accent.copy(alpha = 0.4f) else Neon.BTN_BG)
-        .border(1.dp, accent.copy(alpha = if (active) 1f else 0.35f), RoundedCornerShape(4.dp))
-        .clickable { onClick() }.padding(vertical = 5.dp), contentAlignment = Alignment.Center) {
+        .border(1.dp, accent.copy(alpha = if (active) 1f else 0.35f), RoundedCornerShape(6.dp))
+        .clickable { onClick() }.padding(vertical = 6.dp), contentAlignment = Alignment.Center) {
         Text(label, color = accent, fontSize = 7.sp, fontWeight = FontWeight.Bold)
     }
 }
 
 @Composable
-private fun CenterMixer(engine: AudioEngine, audioCrossfader: Float, onAudioCrossfaderChange: (Float) -> Unit,
-                        crossMode: CrossfaderMode, onCrossModeChange: (CrossfaderMode) -> Unit,
-                        anyPlaying: Boolean, modifier: Modifier = Modifier) {
-    Column(modifier = modifier.clip(RoundedCornerShape(10.dp))
-        .background(Neon.PANEL_DARK)
-        .border(1.dp, Color(0xFF1E1E2E), RoundedCornerShape(10.dp))
-        .padding(6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        Text("MIXER", color = Neon.TEXT_DIM, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
+private fun CenterMixer(engine: AudioEngine, acf: Float, onAcf: (Float) -> Unit,
+                        cm: CrossfaderMode, onCm: (CrossfaderMode) -> Unit,
+                        playing: Boolean, bpm: Float, modifier: Modifier = Modifier) {
+    Column(modifier = modifier.clip(RoundedCornerShape(14.dp))
+        .background(Neon.PANEL_GLASS)
+        .border(1.dp, Neon.BORDER_SOFT, RoundedCornerShape(14.dp))
+        .padding(10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("MIXER", color = Neon.TEXT_DIM, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 4.sp)
+        Text("BPM ${"%.1f".format(bpm)}", color = Neon.CYAN, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
         Row(modifier = Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("A", color = Neon.CYAN, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(2.dp))
+                Text("A", color = Neon.CYAN, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                Spacer(Modifier.height(4.dp))
                 Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                    VolumeFader(accent = Neon.CYAN, initialValue = 0.75f)
+                    VolumeFader(Neon.CYAN, 0.75f)
                 }
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("B", color = Neon.MAGENTA, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(2.dp))
+                Text("B", color = Neon.MAGENTA, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                Spacer(Modifier.height(4.dp))
                 Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                    VolumeFader(accent = Neon.MAGENTA, initialValue = 0.80f)
+                    VolumeFader(Neon.MAGENTA, 0.80f)
                 }
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("VU", color = Neon.TEXT, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(2.dp))
+                Text("VU", color = Neon.TEXT, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                Spacer(Modifier.height(4.dp))
                 Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                    MasterVu(playing = anyPlaying)
+                    MasterVu(playing = playing)
                 }
             }
         }
-        Text("MASTER", color = Neon.TEXT_DIM, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-        Text("CROSSFADER", color = Neon.TEXT_DIM, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-        Slider(value = audioCrossfader, onValueChange = onAudioCrossfaderChange,
+        Text("CROSSFADER", color = Neon.TEXT_DIM, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
+        Slider(value = acf, onValueChange = onAcf,
             colors = SliderDefaults.colors(thumbColor = Neon.CYAN,
-                activeTrackColor = Neon.CYAN.copy(alpha = 0.7f),
-                inactiveTrackColor = Neon.MAGENTA.copy(alpha = 0.7f)),
-            modifier = Modifier.fillMaxWidth().height(18.dp))
+                activeTrackColor = Neon.CYAN.copy(alpha = 0.8f),
+                inactiveTrackColor = Neon.MAGENTA.copy(alpha = 0.8f)),
+            modifier = Modifier.fillMaxWidth().height(20.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-            Text("CUT", color = if (crossMode == CrossfaderMode.CUT) Neon.CYAN else Neon.TEXT_DIM,
-                fontSize = 8.sp, fontWeight = FontWeight.Bold,
-                modifier = Modifier.clickable { onCrossModeChange(CrossfaderMode.CUT) }.padding(horizontal = 4.dp, vertical = 2.dp))
-            Text("|", color = Neon.TEXT_DIM, fontSize = 8.sp)
-            Text("FADE", color = if (crossMode == CrossfaderMode.FADE) Neon.CYAN else Neon.TEXT_DIM,
-                fontSize = 8.sp, fontWeight = FontWeight.Bold,
-                modifier = Modifier.clickable { onCrossModeChange(CrossfaderMode.FADE) }.padding(horizontal = 4.dp, vertical = 2.dp))
+            Text("CUT", color = if (cm == CrossfaderMode.CUT) Neon.CYAN else Neon.TEXT_FAINT,
+                fontSize = 9.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.clickable { onCm(CrossfaderMode.CUT) }.padding(horizontal = 6.dp, vertical = 3.dp))
+            Text("\u2502", color = Neon.TEXT_FAINT, fontSize = 9.sp)
+            Text("FADE", color = if (cm == CrossfaderMode.FADE) Neon.CYAN else Neon.TEXT_FAINT,
+                fontSize = 9.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.clickable { onCm(CrossfaderMode.FADE) }.padding(horizontal = 6.dp, vertical = 3.dp))
         }
     }
 }
 
 @Composable
-private fun SamplerDrawer(
-    context: android.content.Context,
-    revision: Long,
-    onPlayPad: (Int, String) -> Unit,
-    onAssignPad: (Int) -> Unit,
-    onClearPad: (Int) -> Unit
-) {
-    Row(modifier = Modifier.fillMaxWidth().height(84.dp)
-        .clip(RoundedCornerShape(10.dp)).background(Neon.PANEL_DARK)
-        .border(1.dp, Neon.MAGENTA.copy(alpha = 0.5f), RoundedCornerShape(10.dp)).padding(6.dp),
-        horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+private fun SamplerDrawer(context: android.content.Context, revision: Long,
+                          onPlayPad: (Int, String) -> Unit,
+                          onAssignPad: (Int) -> Unit,
+                          onClearPad: (Int) -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth().height(90.dp)
+        .clip(RoundedCornerShape(14.dp)).background(Neon.PANEL_GLASS)
+        .border(1.dp, Neon.MAGENTA.copy(alpha = 0.5f), RoundedCornerShape(14.dp)).padding(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         for (i in 0 until 8) {
             val name = PAD_NAMES[i]
             val accent = if (i % 2 == 0) Neon.MAGENTA else Neon.PURPLE
-            val assignedUri = remember(i, revision) { SampleStore.getAssignedUri(context, i) }
-            val isCustom = assignedUri != null
-            Box(
-                modifier = Modifier.weight(1f).fillMaxHeight()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(accent.copy(alpha = if (isCustom) 0.25f else 0.12f))
-                    .border(if (isCustom) 2.dp else 1.dp, accent.copy(alpha = if (isCustom) 1f else 0.55f), RoundedCornerShape(8.dp))
-                    .pointerInput(i, revision) {
-                        detectTapGestures(onTap = { onPlayPad(i, name) }, onLongPress = { onAssignPad(i) })
-                    },
-                contentAlignment = Alignment.Center
-            ) {
+            val assigned = remember(i, revision) { SampleStore.getAssignedUri(context, i) }
+            val isCustom = assigned != null
+            Box(modifier = Modifier.weight(1f).fillMaxHeight()
+                .clip(RoundedCornerShape(10.dp))
+                .background(accent.copy(alpha = if (isCustom) 0.25f else 0.12f))
+                .border(if (isCustom) 2.dp else 1.dp, accent.copy(alpha = if (isCustom) 1f else 0.55f), RoundedCornerShape(10.dp))
+                .pointerInput(i, revision) {
+                    detectTapGestures(onTap = { onPlayPad(i, name) }, onLongPress = { onAssignPad(i) })
+                }, contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(name, color = accent, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                     Spacer(Modifier.height(2.dp))
@@ -548,10 +588,10 @@ private fun SamplerDrawer(
 private fun FxDrawer(engine: AudioEngine, deckA: Int) {
     var echoOn by remember { mutableStateOf(false) }
     var filterOn by remember { mutableStateOf(false) }
-    Row(modifier = Modifier.fillMaxWidth().height(80.dp)
-        .clip(RoundedCornerShape(10.dp)).background(Neon.PANEL_DARK)
-        .border(1.dp, Neon.PURPLE.copy(alpha = 0.5f), RoundedCornerShape(10.dp)).padding(6.dp),
-        horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+    Row(modifier = Modifier.fillMaxWidth().height(84.dp)
+        .clip(RoundedCornerShape(14.dp)).background(Neon.PANEL_GLASS)
+        .border(1.dp, Neon.PURPLE.copy(alpha = 0.5f), RoundedCornerShape(14.dp)).padding(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         FxPad("ECHO", Neon.CYAN, echoOn, { echoOn = !echoOn; engine.setEcho(echoOn) }, Modifier.weight(1f))
         FxPad("FILTER", Neon.MAGENTA, filterOn, { filterOn = !filterOn; engine.setFilter(filterOn) }, Modifier.weight(1f))
         FxPad("ROLL", Neon.LIME, false, { engine.toggleLoop(deckA, 1) }, Modifier.weight(1f))
@@ -564,34 +604,34 @@ private fun FxDrawer(engine: AudioEngine, deckA: Int) {
 @Composable
 private fun FxPad(label: String, accent: Color, active: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Box(modifier = modifier.fillMaxHeight()
-        .clip(RoundedCornerShape(8.dp))
+        .clip(RoundedCornerShape(10.dp))
         .background(if (active) accent.copy(alpha = 0.35f) else accent.copy(alpha = 0.12f))
-        .border(if (active) 2.dp else 1.dp, accent.copy(alpha = if (active) 1f else 0.55f), RoundedCornerShape(8.dp))
+        .border(if (active) 2.dp else 1.dp, accent.copy(alpha = if (active) 1f else 0.55f), RoundedCornerShape(10.dp))
         .clickable { onClick() }, contentAlignment = Alignment.Center) {
-        Text(label, color = accent, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+        Text(label, color = accent, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
     }
 }
 
 @Composable
 private fun LibraryDrawer(onPickForA: () -> Unit, onPickForB: () -> Unit, onLoadSampleA: () -> Unit, onLoadSampleB: () -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth().height(80.dp)
-        .clip(RoundedCornerShape(10.dp)).background(Neon.PANEL_DARK)
-        .border(1.dp, Neon.CYAN.copy(alpha = 0.5f), RoundedCornerShape(10.dp)).padding(6.dp),
-        horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-        LibBtn("FILE \u2192 A", Neon.CYAN, onPickForA, Modifier.weight(1f))
-        LibBtn("FILE \u2192 B", Neon.MAGENTA, onPickForB, Modifier.weight(1f))
-        LibBtn("SAMPLE A", Neon.LIME, onLoadSampleA, Modifier.weight(1f))
-        LibBtn("SAMPLE B", Neon.ORANGE, onLoadSampleB, Modifier.weight(1f))
+    Row(modifier = Modifier.fillMaxWidth().height(84.dp)
+        .clip(RoundedCornerShape(14.dp)).background(Neon.PANEL_GLASS)
+        .border(1.dp, Neon.CYAN.copy(alpha = 0.5f), RoundedCornerShape(14.dp)).padding(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        LibBtn("VIDEO/AUDIO \u2192 A", Neon.CYAN, onPickForA, Modifier.weight(1f))
+        LibBtn("VIDEO/AUDIO \u2192 B", Neon.MAGENTA, onPickForB, Modifier.weight(1f))
+        LibBtn("DEMO A", Neon.LIME, onLoadSampleA, Modifier.weight(1f))
+        LibBtn("DEMO B", Neon.ORANGE, onLoadSampleB, Modifier.weight(1f))
     }
 }
 
 @Composable
 private fun LibBtn(label: String, accent: Color, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Box(modifier = modifier.fillMaxHeight()
-        .clip(RoundedCornerShape(8.dp)).background(accent.copy(alpha = 0.15f))
-        .border(1.dp, accent.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+        .clip(RoundedCornerShape(10.dp)).background(accent.copy(alpha = 0.15f))
+        .border(1.dp, accent.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
         .clickable { onClick() }, contentAlignment = Alignment.Center) {
-        Text(label, color = accent, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+        Text(label, color = accent, fontSize = 10.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -599,7 +639,7 @@ private fun LibBtn(label: String, accent: Color, onClick: () -> Unit, modifier: 
 private fun BottomBar(activePanel: BottomPanel, onTogglePanel: (BottomPanel) -> Unit,
                       activeDeckA: Int, activeDeckB: Int,
                       onSwapA: (Int) -> Unit, onSwapB: (Int) -> Unit, onLoadSample: (Int) -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
         BarBtn("\u2630 LIB", Neon.CYAN, activePanel == BottomPanel.LIBRARY) { onTogglePanel(BottomPanel.LIBRARY) }
         BarBtn("SAMPLER", Neon.MAGENTA, activePanel == BottomPanel.SAMPLER) { onTogglePanel(BottomPanel.SAMPLER) }
         Spacer(Modifier.weight(1f))
@@ -607,11 +647,11 @@ private fun BottomBar(activePanel: BottomPanel, onTogglePanel: (BottomPanel) -> 
             val isA = id == activeDeckA; val isB = id == activeDeckB
             val active = isA || isB
             val col = if (active) Neon.DECK_COLORS[id] else Neon.TEXT_DIM
-            Box(modifier = Modifier.clip(RoundedCornerShape(6.dp))
+            Box(modifier = Modifier.clip(RoundedCornerShape(8.dp))
                 .background(if (active) Neon.DECK_COLORS[id].copy(alpha = 0.25f) else Neon.BTN_BG)
-                .border(1.dp, col.copy(alpha = if (active) 1f else 0.4f), RoundedCornerShape(6.dp))
+                .border(1.dp, col.copy(alpha = if (active) 1f else 0.4f), RoundedCornerShape(8.dp))
                 .clickable { if (isA) onSwapA(0) else if (isB) onSwapB(1) else { onSwapA(id); onLoadSample(id) } }
-                .padding(horizontal = 6.dp, vertical = 6.dp), contentAlignment = Alignment.Center) {
+                .padding(horizontal = 8.dp, vertical = 7.dp), contentAlignment = Alignment.Center) {
                 Text("D${id + 1}", color = col, fontSize = 9.sp, fontWeight = FontWeight.Bold)
             }
         }
@@ -623,10 +663,10 @@ private fun BottomBar(activePanel: BottomPanel, onTogglePanel: (BottomPanel) -> 
 
 @Composable
 private fun BarBtn(label: String, accent: Color, active: Boolean, onClick: () -> Unit) {
-    Box(modifier = Modifier.clip(RoundedCornerShape(8.dp))
+    Box(modifier = Modifier.clip(RoundedCornerShape(10.dp))
         .background(if (active) accent.copy(alpha = 0.35f) else Neon.BTN_BG)
-        .border(1.dp, accent.copy(alpha = if (active) 1f else 0.5f), RoundedCornerShape(8.dp))
-        .clickable { onClick() }.padding(horizontal = 8.dp, vertical = 7.dp), contentAlignment = Alignment.Center) {
+        .border(1.dp, accent.copy(alpha = if (active) 1f else 0.5f), RoundedCornerShape(10.dp))
+        .clickable { onClick() }.padding(horizontal = 10.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
         Text(label, color = accent, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
     }
 }
@@ -636,7 +676,7 @@ private fun PillBtn(label: String, accent: Color, active: Boolean, onClick: () -
     Box(modifier = modifier.clip(RoundedCornerShape(50))
         .background(if (active) accent else Neon.BTN_BG)
         .border(1.dp, accent.copy(alpha = if (active) 1f else 0.55f), RoundedCornerShape(50))
-        .clickable { onClick() }.padding(vertical = 6.dp), contentAlignment = Alignment.Center) {
+        .clickable { onClick() }.padding(vertical = 7.dp), contentAlignment = Alignment.Center) {
         Text(label, color = if (active) Color.Black else accent, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
     }
 }

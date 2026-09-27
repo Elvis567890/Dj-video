@@ -30,7 +30,7 @@ class MixRecorder(private val context: Context) {
             @Suppress("DEPRECATION") wm.defaultDisplay.getRealMetrics(metrics)
             val w = metrics.widthPixels; val h = metrics.heightPixels; val dpi = metrics.densityDpi
             val dir = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES) ?: context.filesDir
-            outputFile = File(dir, "DJProMix_${System.currentTimeMillis()}.mp4")
+            outputFile = File(dir, "Ultimate_${System.currentTimeMillis()}.mp4")
             val rec: MediaRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) MediaRecorder(context)
             else @Suppress("DEPRECATION") MediaRecorder()
             rec.apply {
@@ -44,9 +44,8 @@ class MixRecorder(private val context: Context) {
             }
             recorder = rec
             virtualDisplay = projection?.createVirtualDisplay(
-                "DJProRec", w, h, dpi, DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-                rec.surface, null, null
-            )
+                "UltimateRec", w, h, dpi, DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                rec.surface, null, null)
             rec.start(); isRecording = true; true
         } catch (_: Throwable) { false }
     }

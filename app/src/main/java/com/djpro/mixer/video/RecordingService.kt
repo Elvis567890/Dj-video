@@ -16,9 +16,9 @@ class RecordingService : Service() {
         val cid = "dj_recording"
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-            nm.createNotificationChannel(NotificationChannel(cid, "DJ Recording", NotificationManager.IMPORTANCE_LOW))
+            nm.createNotificationChannel(NotificationChannel(cid, "Ultimate Recording", NotificationManager.IMPORTANCE_LOW))
         val n: Notification = NotificationCompat.Builder(this, cid)
-            .setContentTitle("DJ Pro Mixer").setContentText("Recording")
+            .setContentTitle("Ultimate").setContentText("Recording")
             .setSmallIcon(android.R.drawable.presence_video_online).setOngoing(true).build()
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
             ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0

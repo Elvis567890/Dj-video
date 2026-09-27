@@ -25,12 +25,10 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.cos
 import kotlin.math.sin
 @Composable
-fun KnobSmall(
-    label: String, accent: Color, initialValue: Float = 0f,
-    minValue: Float = -26f, maxValue: Float = 6f,
-    size: androidx.compose.ui.unit.Dp = 40.dp,
-    onValueChange: (Float) -> Unit = {}, modifier: Modifier = Modifier
-) {
+fun KnobSmall(label: String, accent: Color, initialValue: Float = 0f,
+              minValue: Float = -26f, maxValue: Float = 6f,
+              size: androidx.compose.ui.unit.Dp = 40.dp,
+              onValueChange: (Float) -> Unit = {}, modifier: Modifier = Modifier) {
     var value by remember { mutableFloatStateOf(initialValue) }
     Box(modifier = modifier.size(size).pointerInput(Unit) {
         detectDragGestures { change: PointerInputChange, drag: Offset ->
@@ -43,8 +41,8 @@ fun KnobSmall(
         Canvas(modifier = Modifier.size(size)) {
             val cx = this.size.width / 2f; val cy = this.size.height / 2f
             val r = this.size.minDimension / 2f - 2f
-            drawCircle(Brush.radialGradient(listOf(Color(0xFF2E2E3C), Color(0xFF12121C)), Offset(cx, cy), r), r, Offset(cx, cy))
-            drawCircle(accent.copy(alpha = 0.45f), r, Offset(cx, cy), style = Stroke(width = 1f))
+            drawCircle(Brush.radialGradient(listOf(Color(0xFF26262E), Color(0xFF0F0F18)), Offset(cx, cy), r), r, Offset(cx, cy))
+            drawCircle(accent.copy(alpha = 0.5f), r, Offset(cx, cy), style = Stroke(width = 1f))
             val start = 135f; val sweep = 270f
             drawArc(accent.copy(alpha = 0.22f), start, sweep, false, Offset(cx - r, cy - r), Size(r * 2, r * 2), style = Stroke(1.5f, cap = StrokeCap.Round))
             val range = maxValue - minValue
@@ -52,8 +50,8 @@ fun KnobSmall(
             drawArc(accent, start, sweep * n, false, Offset(cx - r, cy - r), Size(r * 2, r * 2), style = Stroke(2.5f, cap = StrokeCap.Round))
             val aRad = Math.toRadians((start + sweep * n).toDouble())
             drawLine(Color.White, Offset(cx, cy), Offset(cx + (r - 5f) * cos(aRad).toFloat(), cy + (r - 5f) * sin(aRad).toFloat()), 2f, StrokeCap.Round)
-            drawCircle(Color(0xFF1A1A24), 3f, Offset(cx, cy))
+            drawCircle(Color(0xFF141420), 3f, Offset(cx, cy))
         }
-        Text(label, color = accent.copy(alpha = 0.85f), fontSize = 7.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.BottomCenter))
+        Text(label, color = accent.copy(alpha = 0.9f), fontSize = 7.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.BottomCenter))
     }
 }

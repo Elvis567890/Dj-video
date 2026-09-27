@@ -39,11 +39,11 @@ class AudioEngine(context: Context) {
     fun setEcho(on: Boolean) { echoEnabled = on; decks.forEach { it.echo.enabled = on } }
     fun setFilter(on: Boolean) { filterEnabled = on; decks.forEach { it.filter.enabled = on } }
     fun setVocalRemoval(on: Boolean) { vocalRemovalEnabled = on; decks.forEach { it.vocal.enabled = on } }
-    fun setStemMutes(drums: Boolean, bass: Boolean, other: Boolean) {
-        stemDrumsMuted = drums; stemBassMuted = bass; stemOtherMuted = other
-        val lowDb = if (bass) -26f else if (drums) -12f else 0f
-        val highDb = if (other) -26f else 0f
-        decks.forEach { it.eq.lowGainDb = lowDb; it.eq.highGainDb = highDb }
+    fun setStemMutes(d: Boolean, b: Boolean, o: Boolean) {
+        stemDrumsMuted = d; stemBassMuted = b; stemOtherMuted = o
+        val ld = if (b) -26f else if (d) -12f else 0f
+        val hd = if (o) -26f else 0f
+        decks.forEach { it.eq.lowGainDb = ld; it.eq.highGainDb = hd }
     }
     fun setEq(index: Int, low: Float, mid: Float, high: Float) {
         if (index !in decks.indices) return
@@ -52,11 +52,11 @@ class AudioEngine(context: Context) {
         d.eq.midGainDb = mid.coerceIn(-26f, 6f)
         d.eq.highGainDb = high.coerceIn(-26f, 6f)
     }
-    fun syncBpm(sourceIndex: Int, targetIndex: Int) {
-        if (sourceIndex !in decks.indices || targetIndex !in decks.indices) return
-        val src = decks[sourceIndex].bpm; val tgt = decks[targetIndex].bpm
-        if (src <= 0f || tgt <= 0f) return
-        try { decks[targetIndex].player.setPlaybackSpeed((src / tgt).coerceIn(0.5f, 2f)) } catch (_: Throwable) {}
+    fun syncBpm(s: Int, t: Int) {
+        if (s !in decks.indices || t !in decks.indices) return
+        val a = decks[s].bpm; val b = decks[t].bpm
+        if (a <= 0f || b <= 0f) return
+        try { decks[t].player.setPlaybackSpeed((a / b).coerceIn(0.5f, 2f)) } catch (_: Throwable) {}
     }
     fun loadDeck(index: Int, uri: String, name: String = "Loaded") {
         if (index in decks.indices) {
@@ -64,14 +64,14 @@ class AudioEngine(context: Context) {
             history.add(0, name); if (history.size > 20) history.removeAt(history.size - 1)
         }
     }
-    fun togglePlay(index: Int) { if (index in decks.indices) decks[index].toggle() }
-    fun beginScratch(index: Int) { if (index in decks.indices) decks[index].beginScratch() }
-    fun scratchMove(index: Int, dy: Float) { if (index in decks.indices) decks[index].scratchMove(dy) }
-    fun endScratch(index: Int) { if (index in decks.indices) decks[index].endScratch() }
-    fun spinback(index: Int) { if (index in decks.indices) decks[index].spinback() }
-    fun brake(index: Int) { if (index in decks.indices) decks[index].brake() }
-    fun setCue(index: Int, slot: Int) { if (index in decks.indices) decks[index].setCue(slot) }
-    fun jumpCue(index: Int, slot: Int) { if (index in decks.indices) decks[index].jumpToCue(slot) }
-    fun toggleLoop(index: Int, beats: Int) { if (index in decks.indices) decks[index].toggleLoop(beats) }
+    fun togglePlay(i: Int) { if (i in decks.indices) decks[i].toggle() }
+    fun beginScratch(i: Int) { if (i in decks.indices) decks[i].beginScratch() }
+    fun scratchMove(i: Int, dy: Float) { if (i in decks.indices) decks[i].scratchMove(dy) }
+    fun endScratch(i: Int) { if (i in decks.indices) decks[i].endScratch() }
+    fun spinback(i: Int) { if (i in decks.indices) decks[i].spinback() }
+    fun brake(i: Int) { if (i in decks.indices) decks[i].brake() }
+    fun setCue(i: Int, s: Int) { if (i in decks.indices) decks[i].setCue(s) }
+    fun jumpCue(i: Int, s: Int) { if (i in decks.indices) decks[i].jumpToCue(s) }
+    fun toggleLoop(i: Int, b: Int) { if (i in decks.indices) decks[i].toggleLoop(b) }
     fun release() { decks.forEach { it.release() } }
 }
