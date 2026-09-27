@@ -9,8 +9,8 @@ android {
         applicationId = "com.djpro.mixer"
         minSdk = 26
         targetSdk = 34
-        versionCode = 16
-        versionName = "6.2.0"
+        versionCode = 17
+        versionName = "6.3.0"
     }
     buildTypes { release { isMinifyEnabled = false } }
     compileOptions {

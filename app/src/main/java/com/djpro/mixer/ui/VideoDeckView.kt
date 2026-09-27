@@ -148,7 +148,7 @@ fun VideoDeckView(
 private fun GlitchOverlay(accent: Color, intensity: Float, progress: Float) {
     Canvas(modifier = Modifier.fillMaxSize()) {
         val w = size.width; val h = size.height
-        val rnd = Random((progress * 10000).toInt() * 7919)
+        val rnd = Random((progress * 10000f).toInt() * 7919)
         val bars = (8 + intensity * 22).toInt()
         for (i in 0 until bars) {
             val y = rnd.nextFloat() * h

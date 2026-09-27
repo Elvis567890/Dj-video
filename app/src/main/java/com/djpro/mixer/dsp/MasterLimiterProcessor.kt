@@ -14,7 +14,7 @@ class MasterLimiterProcessor : BaseAudioProcessor() {
         val out = replaceOutputBuffer(inputBuffer.remaining())
         while (inputBuffer.remaining() >= 2) {
             val s = inputBuffer.short.toFloat() / 32768f
-            val limited = tanh(s).toFloat() * ceiling
+            val limited = tanh(s.toDouble()).toFloat() * ceiling
             out.putShort((limited * 32767f).toInt().toShort())
         }
         out.flip()

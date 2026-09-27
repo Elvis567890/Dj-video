@@ -22,13 +22,13 @@ class AudioEngine(context: Context) {
     fun setCrossfaderMode(m: CrossfaderMode) { crossfaderMode = m; applyCrossfader() }
     private fun applyCrossfader() {
         val (a, b) = when (crossfaderMode) {
-            CrossfaderMode.FADE -> cos(crossfader * Math.PI / 2).toFloat() to sin(crossfader * Math.PI / 2).toFloat()
+            CrossfaderMode.FADE -> cos(crossfader * Math.PI.toFloat() / 2f) to sin(crossfader * Math.PI.toFloat() / 2f)
             CrossfaderMode.CUT -> {
                 val zone = 0.05f
                 when {
                     crossfader < 0.5f - zone -> 1f to 0f
                     crossfader > 0.5f + zone -> 0f to 1f
-                    else -> { val t = (crossfader - (0.5f - zone)) / (2 * zone); 1f - t to t }
+                    else -> { val t = (crossfader - (0.5f - zone)) / (2 * zone); (1f - t) to t }
                 }
             }
         }
