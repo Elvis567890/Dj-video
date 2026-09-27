@@ -30,18 +30,7 @@ jobs:
           mkdir -p app/src/main/java/com/djpro/mixer/dsp
           mkdir -p app/src/main/java/com/djpro/mixer/video
           mkdir -p app/src/main/java/com/djpro/mixer/ui
-          mkdir -p app/src/main/java/com/djpro/mixer/stems
-          mkdir -p app/src/main/assets
           mkdir -p app/src/main/res/values
-
-      - name: Download HT-Demucs ONNX model
-        run: |
-          wget -q --show-progress -O app/src/main/assets/htdemucs.onnx \
-            "https://huggingface.co/chinedudave06/demucs-onnx/resolve/main/htdemucs.onnx" || \
-          wget -q --show-progress -O app/src/main/assets/htdemucs.onnx \
-            "https://huggingface.co/adowu/htdemucs-onnx/resolve/main/htdemucs.onnx" || \
-          echo "DOWNLOAD_FAILED"
-          ls -lh app/src/main/assets/ || true
 
       - name: Root gradle files
         run: |
@@ -65,14 +54,13 @@ jobs:
           EOF
 
           cat > gradle.properties << 'EOF'
-          org.gradle.jvmargs=-Xmx6144m -Dfile.encoding=UTF-8
+          org.gradle.jvmargs=-Xmx4096m -Dfile.encoding=UTF-8
           android.useAndroidX=true
           android.enableJetifier=false
           kotlin.code.style=official
           android.nonTransitiveRClass=true
           org.gradle.caching=true
           org.gradle.parallel=true
-          android.bundle.enableUncompressedNativeLibs=false
           EOF
 
           cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
@@ -97,16 +85,10 @@ jobs:
                   applicationId = "com.djpro.mixer"
                   minSdk = 26
                   targetSdk = 34
-                  versionCode = 14
-                  versionName = "6.0.0"
+                  versionCode = 15
+                  versionName = "6.1.0"
               }
-              buildTypes {
-                  release {
-                      isMinifyEnabled = false
-                      packaging { resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" } }
-                  }
-                  debug { isMinifyEnabled = false }
-              }
+              buildTypes { release { isMinifyEnabled = false } }
               compileOptions {
                   sourceCompatibility = JavaVersion.VERSION_17
                   targetCompatibility = JavaVersion.VERSION_17
@@ -124,10 +106,6 @@ jobs:
                       excludes += "/META-INF/LICENSE*"
                       excludes += "/META-INF/NOTICE*"
                   }
-                  jniLibs { useLegacyPackaging = false }
-              }
-              androidResources {
-                  noCompress += listOf("onnx")
               }
               lint { abortOnError = false; checkReleaseBuilds = false }
           }
@@ -144,7 +122,6 @@ jobs:
               implementation("androidx.media3:media3-exoplayer:1.4.1")
               implementation("androidx.media3:media3-ui:1.4.1")
               implementation("androidx.media3:media3-common:1.4.1")
-              implementation("com.microsoft.onnxruntime:onnxruntime-android:1.17.0")
               implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
           }
           EOF
@@ -169,7 +146,6 @@ jobs:
                   android:largeHeap="true"
                   android:usesCleartextTraffic="true"
                   android:hardwareAccelerated="true"
-                  android:extractNativeLibs="true"
                   android:theme="@style/Theme.DJPro"
                   tools:ignore="GoogleAppIndexingWarning,UnusedAttribute">
                   <activity
@@ -378,326 +354,6 @@ jobs:
           }
           EOF
 
-      - name: FFT implementation
-        run: |
-          cat > app/src/main/java/com/djpro/mixer/stems/Fft.kt << 'EOF'
-          package com.djpro.mixer.stems
-          import kotlin.math.cos
-          import kotlin.math.sin
-
-          /**
-           * Minimal Cooley-Tukey radix-2 FFT.
-           * Requires input size to be a power of two.
-           */
-          object Fft {
-
-              fun fft(re: FloatArray, im: FloatArray, invert: Boolean = false) {
-                  val n = re.size
-                  require(n == im.size && Integer.bitCount(n) == 1) { "FFT size must be a power of two" }
-
-                  // Bit-reversal permutation
-                  var j = 0
-                  for (i in 1 until n) {
-                      var bit = n shr 1
-                      while (j and bit != 0) { j = j xor bit; bit = bit shr 1 }
-                      j = j or bit
-                      if (i < j) {
-                          val tr = re[i]; re[i] = re[j]; re[j] = tr
-                          val ti = im[i]; im[i] = im[j]; im[j] = ti
-                      }
-                  }
-
-                  // Butterflies
-                  var len = 2
-                  while (len <= n) {
-                      val ang = 2.0 * Math.PI / len * (if (invert) 1 else -1)
-                      val wRe = cos(ang).toFloat()
-                      val wIm = sin(ang).toFloat()
-                      var i = 0
-                      while (i < n) {
-                          var curRe = 1f
-                          var curIm = 0f
-                          for (k in 0 until len / 2) {
-                              val uRe = re[i + k]
-                              val uIm = im[i + k]
-                              val vRe = re[i + k + len / 2] * curRe - im[i + k + len / 2] * curIm
-                              val vIm = re[i + k + len / 2] * curIm + im[i + k + len / 2] * curRe
-                              re[i + k] = uRe + vRe
-                              im[i + k] = uIm + vIm
-                              re[i + k + len / 2] = uRe - vRe
-                              im[i + k + len / 2] = uIm - vIm
-                              val newCurRe = curRe * wRe - curIm * wIm
-                              curIm = curRe * wIm + curIm * wRe
-                              curRe = newCurRe
-                          }
-                          i += len
-                      }
-                      len = len shl 1
-                  }
-
-                  if (invert) {
-                      for (i in 0 until n) { re[i] /= n; im[i] /= n }
-                  }
-              }
-
-              fun hannWindow(size: Int): FloatArray = FloatArray(size) { i ->
-                  (0.5 * (1.0 - cos(2.0 * Math.PI * i / (size - 1)))).toFloat()
-              }
-          }
-          EOF
-
-      - name: StemSeparator.kt (the AI engine)
-        run: |
-          cat > app/src/main/java/com/djpro/mixer/stems/StemSeparator.kt << 'EOF'
-          package com.djpro.mixer.stems
-
-          import ai.onnxruntime.OnnxTensor
-          import ai.onnxruntime.OrtEnvironment
-          import ai.onnxruntime.OrtSession
-          import android.content.Context
-          import kotlinx.coroutines.Dispatchers
-          import kotlinx.coroutines.withContext
-          import java.nio.FloatBuffer
-          import java.nio.ByteBuffer
-          import java.nio.ByteOrder
-          import kotlin.math.abs
-          import kotlin.math.sqrt
-
-          /**
-           * Simplified on-device stem separation using an ONNX Runtime model.
-           *
-           * This implementation performs the STFT/ISTFT pipeline in Kotlin:
-           *   1. Convert PCM FloatArray (stereo interleaved) -> magnitude spectrogram
-           *   2. Feed magnitude spectrogram to the ONNX model
-           *   3. Model returns 4 masked spectrograms (vocals/drums/bass/other)
-           *   4. ISTFT each mask back to waveform and mix to stereo
-           *
-           * The model file `htdemucs.onnx` is loaded from app assets.
-           */
-          class StemSeparator(private val context: Context) {
-
-              data class Stems(
-                  val vocals: FloatArray,   // stereo interleaved
-                  val drums: FloatArray,
-                  val bass: FloatArray,
-                  val other: FloatArray,
-                  val sampleRate: Int
-              )
-
-              private val env: OrtEnvironment = OrtEnvironment.getEnvironment()
-              private var session: OrtSession? = null
-              private var inputName: String = "input"
-              private var outputNames: List<String> = listOf("vocals", "drums", "bass", "other")
-              var isReady: Boolean = false; private set
-
-              private val nFft = 4096
-              private val hop = 1024
-              private val window = Fft.hannWindow(nFft)
-
-              suspend fun loadModel(): Boolean = withContext(Dispatchers.IO) {
-                  try {
-                      val bytes = context.assets.open("htdemucs.onnx").use { it.readBytes() }
-                      val opts = OrtSession.SessionOptions().apply {
-                          setIntraOpNumThreads(2)
-                      }
-                      session = env.createSession(bytes, opts)
-                      inputName = session?.inputNames?.firstOrNull() ?: "input"
-                      val outs = session?.outputNames?.toList() ?: emptyList()
-                      if (outs.isNotEmpty()) outputNames = outs
-                      isReady = true
-                      true
-                  } catch (t: Throwable) {
-                      isReady = false
-                      false
-                  }
-              }
-
-              /**
-               * Run separation on a stereo interleaved float buffer.
-               * samples: FloatArray with L,R,L,R,... at given sampleRate.
-               */
-              suspend fun separate(samples: FloatArray, sampleRate: Int): Stems? = withContext(Dispatchers.Default) {
-                  val sess = session ?: return@withContext null
-                  if (samples.size < nFft * 2) return@withContext null
-
-                  try {
-                      val numSamples = samples.size / 2
-                      val left = FloatArray(numSamples)
-                      val right = FloatArray(numSamples)
-                      for (i in 0 until numSamples) {
-                          left[i] = samples[i * 2]
-                          right[i] = samples[i * 2 + 1]
-                      }
-
-                      // Resample to 44100 if needed (naive linear)
-                      val targetSr = 44100
-                      val (l44, r44) = if (sampleRate != targetSr) {
-                          val ratio = targetSr.toDouble() / sampleRate
-                          val outLen = (numSamples * ratio).toInt()
-                          val lo = FloatArray(outLen); val ro = FloatArray(outLen)
-                          for (i in 0 until outLen) {
-                              val src = i / ratio
-                              val i0 = src.toInt().coerceIn(0, numSamples - 1)
-                              val i1 = (i0 + 1).coerceAtMost(numSamples - 1)
-                              val t = (src - i0).toFloat()
-                              lo[i] = left[i0] * (1 - t) + left[i1] * t
-                              ro[i] = right[i0] * (1 - t) + right[i1] * t
-                          }
-                          lo to ro
-                      } else left to right
-
-                      // STFT
-                      val numFrames = 1 + (l44.size - nFft) / hop
-                      if (numFrames <= 0) return@withContext null
-                      val numBins = nFft / 2 + 1
-
-                      val magL = Array(numFrames) { FloatArray(numBins) }
-                      val magR = Array(numFrames) { FloatArray(numBins) }
-                      val phaseL = Array(numFrames) { FloatArray(numBins) }
-                      val phaseR = Array(numFrames) { FloatArray(numBins) }
-
-                      for (f in 0 until numFrames) {
-                          val reL = FloatArray(nFft); val imL = FloatArray(nFft)
-                          val reR = FloatArray(nFft); val imR = FloatArray(nFft)
-                          val start = f * hop
-                          for (i in 0 until nFft) {
-                              val w = window[i]
-                              reL[i] = l44[start + i] * w
-                              reR[i] = r44[start + i] * w
-                          }
-                          Fft.fft(reL, imL, false)
-                          Fft.fft(reR, imR, false)
-                          for (b in 0 until numBins) {
-                              val ml = sqrt(reL[b] * reL[b] + imL[b] * imL[b])
-                              val mr = sqrt(reR[b] * reR[b] + imR[b] * imR[b])
-                              magL[f][b] = ml
-                              magR[f][b] = mr
-                              phaseL[f][b] = kotlin.math.atan2(imL[b], reL[b])
-                              phaseR[f][b] = kotlin.math.atan2(imR[b], reR[b])
-                          }
-                      }
-
-                      // Build model input: (1, 2, numBins, numFrames)
-                      val inputFloats = FloatArray(2 * numBins * numFrames)
-                      var idx = 0
-                      for (b in 0 until numBins) for (f in 0 until numFrames) inputFloats[idx++] = magL[f][b]
-                      for (b in 0 until numBins) for (f in 0 until numFrames) inputFloats[idx++] = magR[f][b]
-
-                      val shape = longArrayOf(1, 2, numBins.toLong(), numFrames.toLong())
-                      val tensor = OnnxTensor.createTensor(
-                          env,
-                          FloatBuffer.wrap(inputFloats),
-                          shape
-                      )
-
-                      val inputs = mapOf(inputName to tensor)
-                      val result = sess.run(inputs)
-
-                      // Model is expected to output 4 tensors each (1, 2, numBins, numFrames)
-                      // If output shape differs, we fall back to mid/side split.
-                      val stemMasks = mutableListOf<FloatArray>()
-                      for (i in outputNames.indices) {
-                          try {
-                              val t = result.get(i) as? OnnxTensor ?: break
-                              val buf = t.floatBuffer
-                              val arr = FloatArray(buf.remaining())
-                              buf.get(arr)
-                              stemMasks.add(arr)
-                          } catch (_: Throwable) { break }
-                      }
-
-                      val karaoke = FloatArray(l44.size * 2)
-                      // If model produced >= 3 masks (vocals, drums, bass), sum non-vocal for karaoke
-                      // Otherwise, use mid/side removal as fallback
-                      if (stemMasks.size >= 4 && stemMasks[0].size == 2 * numBins * numFrames) {
-                          // Sum drums + bass + other masks
-                          val sumMasks = FloatArray(2 * numBins * numFrames)
-                          for (stem in 1 until 4) {
-                              val m = stemMasks[stem]
-                              for (k in sumMasks.indices) sumMasks[k] += m[k]
-                          }
-                          // Reconstruct karaoke via ISTFT using magnitude = mask * original
-                          val reconL = istftFromMask(sumMasks, numBins, numFrames, 0, phaseL)
-                          val reconR = istftFromMask(sumMasks, numBins, numFrames, 1, phaseR)
-                          for (i in reconL.indices) {
-                              val s = if (i < karaoke.size / 2) i else i
-                              if (i * 2 + 1 < karaoke.size) {
-                                  karaoke[i * 2] = reconL[i].coerceIn(-1f, 1f)
-                                  karaoke[i * 2 + 1] = reconR[i].coerceIn(-1f, 1f)
-                              }
-                          }
-                      } else {
-                          // Fallback: mid/side
-                          for (i in 0 until numSamples) {
-                              val l = left[i]; val r = right[i]
-                              val side = (l - r) * 0.5f
-                              karaoke[i * 2] = side * 2f
-                              karaoke[i * 2 + 1] = -side * 2f
-                          }
-                      }
-
-                      tensor.close()
-                      result.close()
-
-                      // We return karaoke as the "vocals removed" track
-                      Stems(
-                          vocals = FloatArray(0),
-                          drums = karaoke,
-                          bass = FloatArray(0),
-                          other = FloatArray(0),
-                          sampleRate = sampleRate
-                      )
-                  } catch (t: Throwable) {
-                      null
-                  }
-              }
-
-              private fun istftFromMask(
-                  masks: FloatArray,
-                  numBins: Int,
-                  numFrames: Int,
-                  channel: Int,
-                  phases: Array<FloatArray>
-              ): FloatArray {
-                  val outLen = (numFrames - 1) * hop + nFft
-                  val out = FloatArray(outLen)
-                  val winSum = FloatArray(outLen)
-                  val re = FloatArray(nFft); val im = FloatArray(nFft)
-                  for (f in 0 until numFrames) {
-                      java.util.Arrays.fill(re, 0f)
-                      java.util.Arrays.fill(im, 0f)
-                      for (b in 0 until numBins) {
-                          val maskIdx = channel * (numBins * numFrames) + b * numFrames + f
-                          val mag = masks[maskIdx]
-                          val ph = phases[f][b]
-                          re[b] = mag * kotlin.math.cos(ph)
-                          im[b] = mag * kotlin.math.sin(ph)
-                          if (b > 0 && b < numBins - 1) {
-                              val bMirror = nFft - b
-                              re[bMirror] = re[b]
-                              im[bMirror] = -im[b]
-                          }
-                      }
-                      Fft.fft(re, im, true)
-                      val start = f * hop
-                      for (i in 0 until nFft) {
-                          out[start + i] += re[i] * window[i]
-                          winSum[start + i] += window[i] * window[i]
-                      }
-                  }
-                  for (i in out.indices) {
-                      if (winSum[i] > 1e-6f) out[i] /= winSum[i]
-                  }
-                  return out
-              }
-
-              fun release() {
-                  try { session?.close() } catch (_: Throwable) {}
-                  try { env.close() } catch (_: Throwable) {}
-              }
-          }
-          EOF
-
       - name: DeckPlayer.kt
         run: |
           cat > app/src/main/java/com/djpro/mixer/audio/DeckPlayer.kt << 'EOF'
@@ -747,7 +403,6 @@ jobs:
               var scratchVelocity by mutableFloatStateOf(0f); private set
               var bpm: Float = 128f; private set
               var loadedName: String = ""; private set
-              var localFilePath: String? = null; private set
               val cuePoints = LongArray(8) { -1L }
               var loopActive by mutableStateOf(false); private set
               var loopBeats = 4; private set
@@ -760,11 +415,10 @@ jobs:
               private var effectJob: Job? = null
               private var loopJob: Job? = null
 
-              fun load(uri: String, displayName: String = "Loaded", path: String? = null) {
+              fun load(uri: String, displayName: String = "Loaded") {
                   try {
                       player.setMediaItem(MediaItem.fromUri(uri)); player.prepare()
                       isLoaded = true; bpm = 120f + (0..16).random(); loadedName = displayName
-                      localFilePath = path
                   } catch (_: Throwable) { isLoaded = false }
               }
               fun play() { try { player.play(); isPlaying = true } catch (_: Throwable) {} }
@@ -931,9 +585,9 @@ jobs:
                   if (src <= 0f || tgt <= 0f) return
                   try { decks[targetIndex].player.setPlaybackSpeed((src / tgt).coerceIn(0.5f, 2f)) } catch (_: Throwable) {}
               }
-              fun loadDeck(index: Int, uri: String, name: String = "Loaded", path: String? = null) {
+              fun loadDeck(index: Int, uri: String, name: String = "Loaded") {
                   if (index in decks.indices) {
-                      decks[index].load(uri, name, path)
+                      decks[index].load(uri, name)
                       history.add(0, name); if (history.size > 20) history.removeAt(history.size - 1)
                   }
               }
@@ -1073,6 +727,201 @@ jobs:
               val TEXT_DIM = Color(0x80E5E5F0)
               val LIVE = Color(0xFF4BFF7A)
               val DECK_COLORS = listOf(CYAN, MAGENTA, LIME, ORANGE, PURPLE, RED)
+          }
+          EOF
+
+      - name: VideoDeckView with 9 transitions
+        run: |
+          cat > app/src/main/java/com/djpro/mixer/ui/VideoDeckView.kt << 'EOF'
+          package com.djpro.mixer.ui
+
+          import android.view.TextureView
+          import androidx.compose.animation.core.animateFloatAsState
+          import androidx.compose.animation.core.tween
+          import androidx.compose.foundation.Canvas
+          import androidx.compose.foundation.layout.Box
+          import androidx.compose.foundation.layout.fillMaxSize
+          import androidx.compose.runtime.Composable
+          import androidx.compose.runtime.getValue
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.draw.clipToBounds
+          import androidx.compose.ui.geometry.Offset
+          import androidx.compose.ui.geometry.Size
+          import androidx.compose.ui.graphics.Color
+          import androidx.compose.ui.graphics.graphicsLayer
+          import androidx.compose.ui.viewinterop.AndroidView
+          import com.djpro.mixer.audio.DeckPlayer
+          import kotlin.math.abs
+          import kotlin.math.sin
+          import kotlin.random.Random
+
+          enum class VideoTransition {
+              CROSSFADE, ZOOM, WIPE, SLIDE, FLIP, GLITCH, STROBE, SPIN, BURN
+          }
+
+          @Composable
+          fun VideoDeckView(
+              deck: DeckPlayer,
+              progress: Float,
+              isIncoming: Boolean,
+              transition: VideoTransition = VideoTransition.CROSSFADE,
+              accentColor: Color = Color.Cyan,
+              showScratchOverlay: Boolean = true,
+              modifier: Modifier = Modifier
+          ) {
+              val p = if (isIncoming) progress else (1f - progress)
+              val t = 1f - abs(progress - 0.5f) * 2f
+
+              val smoothP by animateFloatAsState(p, tween(80), label = "vp")
+              val smoothT by animateFloatAsState(t, tween(120), label = "vt")
+
+              var alpha = smoothP
+              var sx = 1f
+              var sy = 1f
+              var tx = 0f
+              var ty = 0f
+              var rotY = 0f
+              var rotZ = 0f
+              var camDist = 12f
+
+              when (transition) {
+                  VideoTransition.CROSSFADE -> { alpha = smoothP }
+                  VideoTransition.ZOOM -> {
+                      alpha = smoothP
+                      val s = 0.80f + 0.20f * smoothP
+                      sx = s; sy = s
+                  }
+                  VideoTransition.WIPE -> {
+                      alpha = smoothP
+                      if (isIncoming) tx = (1f - progress) * 3000f
+                  }
+                  VideoTransition.SLIDE -> {
+                      alpha = if (p > 0.02f) 1f else 0f
+                      tx = if (isIncoming) -(1f - progress) * 3000f else progress * 3000f
+                  }
+                  VideoTransition.FLIP -> {
+                      rotY = if (isIncoming) (progress - 1f) * 180f else progress * 180f
+                      alpha = if (abs(rotY) < 89f) 1f else 0f
+                      camDist = 8f
+                  }
+                  VideoTransition.GLITCH -> {
+                      alpha = smoothP
+                      val jitterAmp = smoothT * 32f
+                      val rnd = Random((progress * 1000f).toInt() * 7919)
+                      tx = (rnd.nextFloat() - 0.5f) * jitterAmp
+                      ty = (rnd.nextFloat() - 0.5f) * jitterAmp * 0.35f
+                      sx = 1f + smoothT * 0.04f * (rnd.nextFloat() - 0.5f)
+                      sy = 1f + smoothT * 0.04f * (rnd.nextFloat() - 0.5f)
+                  }
+                  VideoTransition.STROBE -> {
+                      val flick = if (smoothT > 0.02f) {
+                          val s = sin(progress * 95f)
+                          if (s > 0f) 1f else 0.15f
+                      } else 1f
+                      alpha = smoothP * flick
+                  }
+                  VideoTransition.SPIN -> {
+                      alpha = smoothP
+                      val dir = if (isIncoming) 1f else -1f
+                      rotZ = (1f - smoothP) * 360f * dir
+                      val s = 0.55f + 0.45f * smoothP
+                      sx = s; sy = s
+                  }
+                  VideoTransition.BURN -> {
+                      alpha = smoothP
+                      val s = 1f + smoothT * 0.18f
+                      sx = s; sy = s
+                  }
+              }
+
+              Box(modifier = modifier.clipToBounds()) {
+                  AndroidView(
+                      modifier = Modifier
+                          .fillMaxSize()
+                          .graphicsLayer {
+                              this.alpha = alpha.coerceIn(0f, 1f)
+                              scaleX = sx
+                              scaleY = sy
+                              translationX = tx
+                              translationY = ty
+                              rotationY = rotY
+                              rotationZ = rotZ
+                              cameraDistance = camDist * density
+                          },
+                      factory = { ctx ->
+                          TextureView(ctx).apply {
+                              isOpaque = true
+                              deck.player.setVideoTextureView(this)
+                          }
+                      }
+                  )
+
+                  if (smoothT > 0.05f && alpha > 0.15f) {
+                      when (transition) {
+                          VideoTransition.GLITCH -> GlitchOverlay(accentColor, smoothT, progress)
+                          VideoTransition.STROBE -> StrobeOverlay(accentColor, smoothT, progress)
+                          VideoTransition.BURN -> BurnOverlay(accentColor, smoothT)
+                          else -> {}
+                      }
+                  }
+
+                  val scratching = deck.scratching
+                  if (showScratchOverlay && scratching && alpha > 0.3f) {
+                      ScratchOverlay(
+                          accent = accentColor,
+                          rate = deck.scratchRate,
+                          velocity = deck.scratchVelocity,
+                          modifier = Modifier
+                              .fillMaxSize()
+                              .graphicsLayer { this.alpha = alpha.coerceIn(0f, 1f) }
+                      )
+                  }
+              }
+          }
+
+          @Composable
+          private fun GlitchOverlay(accent: Color, intensity: Float, progress: Float) {
+              Canvas(modifier = Modifier.fillMaxSize()) {
+                  val w = size.width; val h = size.height
+                  val rnd = Random((progress * 10000).toInt() * 7919)
+                  val bars = (8 + intensity * 22).toInt()
+                  for (i in 0 until bars) {
+                      val y = rnd.nextFloat() * h
+                      val barH = 1f + rnd.nextFloat() * (2f + 10f * intensity)
+                      val xOff = (rnd.nextFloat() - 0.5f) * 90f * intensity
+                      val a = 0.20f + 0.55f * intensity * rnd.nextFloat()
+                      val col = when (rnd.nextInt(3)) {
+                          0 -> accent.copy(alpha = a)
+                          1 -> Color(0xFFFF0044).copy(alpha = a * 0.8f)
+                          else -> Color(0xFF00FF88).copy(alpha = a * 0.6f)
+                      }
+                      drawRect(color = col, topLeft = Offset(xOff, y), size = Size(w, barH))
+                  }
+                  if (intensity > 0.6f) {
+                      drawRect(color = Color.Red.copy(alpha = 0.18f * intensity), topLeft = Offset(-6f, 0f), size = Size(w * 0.4f, h))
+                      drawRect(color = Color.Cyan.copy(alpha = 0.18f * intensity), topLeft = Offset(w * 0.6f + 6f, 0f), size = Size(w * 0.4f, h))
+                  }
+              }
+          }
+
+          @Composable
+          private fun StrobeOverlay(accent: Color, intensity: Float, progress: Float) {
+              val flash = (sin(progress * 95f) * 0.5f + 0.5f).coerceIn(0f, 1f)
+              Canvas(modifier = Modifier.fillMaxSize()) {
+                  val a = flash * intensity * 0.55f
+                  drawRect(color = Color.White.copy(alpha = a))
+                  drawRect(color = accent.copy(alpha = a * 0.35f))
+              }
+          }
+
+          @Composable
+          private fun BurnOverlay(accent: Color, intensity: Float) {
+              Canvas(modifier = Modifier.fillMaxSize()) {
+                  val w = size.width; val h = size.height
+                  drawRect(color = Color(0xFFFF6A00).copy(alpha = 0.18f * intensity))
+                  drawRect(color = Color.White.copy(alpha = 0.35f * intensity),
+                      topLeft = Offset(0f, h * 0.45f), size = Size(w, h * 0.1f))
+              }
           }
           EOF
 
@@ -1432,62 +1281,6 @@ jobs:
           }
           EOF
 
-          cat > app/src/main/java/com/djpro/mixer/ui/VideoDeckView.kt << 'EOF'
-          package com.djpro.mixer.ui
-          import androidx.compose.animation.core.animateFloatAsState
-          import androidx.compose.animation.core.tween
-          import androidx.compose.foundation.layout.Box
-          import androidx.compose.foundation.layout.fillMaxSize
-          import androidx.compose.runtime.Composable
-          import androidx.compose.runtime.getValue
-          import androidx.compose.ui.Modifier
-          import androidx.compose.ui.graphics.Color
-          import androidx.compose.ui.graphics.graphicsLayer
-          import androidx.compose.ui.viewinterop.AndroidView
-          import androidx.media3.ui.PlayerView
-          import com.djpro.mixer.audio.DeckPlayer
-          enum class VideoTransition { CROSSFADE, ZOOM, WIPE }
-          @Composable
-          fun VideoDeckView(
-              deck: DeckPlayer, alpha: Float,
-              transition: VideoTransition = VideoTransition.CROSSFADE,
-              accentColor: Color = Color.Cyan,
-              showScratchOverlay: Boolean = true,
-              modifier: Modifier = Modifier
-          ) {
-              val scaleTarget = when (transition) { VideoTransition.ZOOM -> 0.85f + 0.15f * alpha; else -> 1f }
-              val scale by animateFloatAsState(scaleTarget, tween(220), label = "vscale")
-              val wipeX by animateFloatAsState(
-                  when (transition) { VideoTransition.WIPE -> (1f - alpha) * 1200f; else -> 0f },
-                  tween(220), label = "wipe")
-              val scratching = deck.scratching
-              val vel = deck.scratchVelocity
-              val stretchX = if (scratching) (1f + (vel * 0.03f).coerceIn(-0.06f, 0.06f)) else 1f
-              val jitterX = if (scratching) (vel * 4f).coerceIn(-14f, 14f) else 0f
-              Box(modifier = modifier) {
-                  AndroidView(
-                      modifier = Modifier.fillMaxSize().graphicsLayer {
-                          this.alpha = alpha.coerceIn(0f, 1f)
-                          scaleX = scale * stretchX
-                          scaleY = scale
-                          translationX = wipeX + jitterX
-                      },
-                      factory = { ctx ->
-                          PlayerView(ctx).apply {
-                              player = deck.player
-                              useController = false
-                              setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
-                          }
-                      }
-                  )
-                  if (showScratchOverlay && scratching && alpha > 0.3f) {
-                      ScratchOverlay(accent = accentColor, rate = deck.scratchRate, velocity = vel,
-                          modifier = Modifier.fillMaxSize().graphicsLayer { this.alpha = alpha.coerceIn(0f, 1f) })
-                  }
-              }
-          }
-          EOF
-
       - name: MainActivity.kt
         run: |
           cat > app/src/main/java/com/djpro/mixer/MainActivity.kt << 'EOF'
@@ -1501,34 +1294,26 @@ jobs:
           import androidx.compose.material3.MaterialTheme
           import androidx.compose.ui.Modifier
           import com.djpro.mixer.audio.AudioEngine
-          import com.djpro.mixer.stems.StemSeparator
           import com.djpro.mixer.video.MixRecorder
           class MainActivity : ComponentActivity() {
               private lateinit var engine: AudioEngine
               private lateinit var recorder: MixRecorder
-              private lateinit var stemSep: StemSeparator
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
                   engine = AudioEngine(this)
                   recorder = MixRecorder(this)
-                  stemSep = StemSeparator(this)
                   val activityRef = this
                   val engineRef = engine
                   val recorderRef = recorder
-                  val stemRef = stemSep
                   setContent {
                       MaterialTheme {
                           Box(modifier = Modifier.fillMaxSize().background(Neon.BG)) {
-                              MainScreen(engineRef, recorderRef, stemRef, activityRef)
+                              MainScreen(engineRef, recorderRef, activityRef)
                           }
                       }
                   }
               }
-              override fun onDestroy() {
-                  super.onDestroy(); engine.release()
-                  try { recorder.stop() } catch (_: Throwable) {}
-                  try { stemSep.release() } catch (_: Throwable) {}
-              }
+              override fun onDestroy() { super.onDestroy(); engine.release(); try { recorder.stop() } catch (_: Throwable) {} }
           }
           EOF
 
@@ -1546,6 +1331,7 @@ jobs:
           import androidx.compose.foundation.border
           import androidx.compose.foundation.clickable
           import androidx.compose.foundation.gestures.detectTapGestures
+          import androidx.compose.foundation.horizontalScroll
           import androidx.compose.foundation.layout.Arrangement
           import androidx.compose.foundation.layout.Box
           import androidx.compose.foundation.layout.Column
@@ -1559,6 +1345,7 @@ jobs:
           import androidx.compose.foundation.layout.padding
           import androidx.compose.foundation.layout.size
           import androidx.compose.foundation.layout.width
+          import androidx.compose.foundation.rememberScrollState
           import androidx.compose.foundation.shape.CircleShape
           import androidx.compose.foundation.shape.RoundedCornerShape
           import androidx.compose.material.icons.Icons
@@ -1575,7 +1362,6 @@ jobs:
           import androidx.compose.runtime.mutableLongStateOf
           import androidx.compose.runtime.mutableStateOf
           import androidx.compose.runtime.remember
-          import androidx.compose.runtime.rememberCoroutineScope
           import androidx.compose.runtime.setValue
           import androidx.compose.ui.Alignment
           import androidx.compose.ui.Modifier
@@ -1593,7 +1379,6 @@ jobs:
           import com.djpro.mixer.audio.SampleFilePlayer
           import com.djpro.mixer.audio.SampleStore
           import com.djpro.mixer.audio.SampleSynth
-          import com.djpro.mixer.stems.StemSeparator
           import com.djpro.mixer.ui.BeatgridWaveform
           import com.djpro.mixer.ui.KnobSmall
           import com.djpro.mixer.ui.MasterVu
@@ -1603,18 +1388,16 @@ jobs:
           import com.djpro.mixer.ui.VolumeFader
           import com.djpro.mixer.video.MixRecorder
           import kotlinx.coroutines.delay
-          import kotlinx.coroutines.launch
 
           private const val SAMPLE_VIDEO_1 = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
           private const val SAMPLE_VIDEO_2 = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
           private val PAD_NAMES = listOf("KICK", "SNARE", "HIHAT", "CLAP", "PERC", "RISER", "LASER", "SIREN")
 
-          private enum class BottomPanel { NONE, SAMPLER, FX, LIBRARY, AI }
+          private enum class BottomPanel { NONE, SAMPLER, FX, LIBRARY }
 
           @Composable
-          fun MainScreen(engine: AudioEngine, recorder: MixRecorder, stemSep: StemSeparator, activity: Activity) {
+          fun MainScreen(engine: AudioEngine, recorder: MixRecorder, activity: Activity) {
               val context = LocalContext.current
-              val scope = rememberCoroutineScope()
               var audioCrossfader by remember { mutableFloatStateOf(0.5f) }
               var videoCrossfader by remember { mutableFloatStateOf(0.5f) }
               var crossMode by remember { mutableStateOf(CrossfaderMode.FADE) }
@@ -1629,12 +1412,6 @@ jobs:
               var pendingPadIndex by remember { mutableStateOf<Int?>(null) }
               var recording by remember { mutableStateOf(false) }
               var padRev by remember { mutableLongStateOf(0L) }
-
-              // AI stem separation state
-              var aiLoading by remember { mutableStateOf(false) }
-              var aiReady by remember { mutableStateOf(false) }
-              var aiProgress by remember { mutableStateOf("") }
-              var aiDone by remember { mutableStateOf(false) }
 
               val recordLauncher = rememberLauncherForActivityResult(
                   contract = ActivityResultContracts.StartActivityForResult()
@@ -1651,7 +1428,7 @@ jobs:
                   if (uri != null && id != null) {
                       try { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Throwable) {}
                       val name = uri.lastPathSegment?.substringAfterLast('/') ?: "Picked"
-                      engine.loadDeck(id, uri.toString(), name, uri.path)
+                      engine.loadDeck(id, uri.toString(), name)
                   }
               }
               fun pickFile(id: Int) { pendingDeckId = id; filePicker.launch(arrayOf("video/*", "audio/*")) }
@@ -1749,48 +1526,6 @@ jobs:
                           onLoadSampleA = { engine.loadDeck(activeDeckA, SAMPLE_VIDEO_1, "Sample A") },
                           onLoadSampleB = { engine.loadDeck(activeDeckB, SAMPLE_VIDEO_2, "Sample B") })
                       Spacer(Modifier.height(4.dp))
-                  } else if (bottomPanel == BottomPanel.AI) {
-                      AiStemDrawer(
-                          aiLoading = aiLoading, aiReady = aiReady,
-                          aiProgress = aiProgress, aiDone = aiDone,
-                          onLoadModel = {
-                              scope.launch {
-                                  aiLoading = true
-                                  aiProgress = "Loading AI model…"
-                                  val ok = stemSep.loadModel()
-                                  aiReady = ok
-                                  aiLoading = false
-                                  aiProgress = if (ok) "Model ready" else "Model missing — see README"
-                              }
-                          },
-                          onSeparate = {
-                              scope.launch {
-                                  aiLoading = true
-                                  aiProgress = "Running AI separation…"
-                                  // We use the current deck's audio by reading the file
-                                  val d = engine.decks[activeDeckA]
-                                  val path = d.localFilePath
-                                  if (path != null) {
-                                      // Read the file as PCM using MediaExtractor+MediaCodec would be ideal,
-                                      // but for simplicity we use Media3's current position snapshot.
-                                      aiProgress = "AI input not available for URL streams. Load local file first."
-                                      aiLoading = false
-                                  } else {
-                                      aiProgress = "Load a local file first (LIB → FILE → A)"
-                                      aiLoading = false
-                                  }
-                              }
-                          },
-                          onEnableVocalRemoval = {
-                              engine.setVocalRemoval(true)
-                              aiProgress = "Mid/Side vocal removal enabled on both decks"
-                          },
-                          onEnableBeatRemoval = {
-                              engine.setStemMutes(drums = true, bass = false, other = false)
-                              aiProgress = "Beat removal enabled on both decks"
-                          }
-                      )
-                      Spacer(Modifier.height(4.dp))
                   }
                   BottomBar(activePanel = bottomPanel,
                       onTogglePanel = { p -> bottomPanel = if (bottomPanel == p) BottomPanel.NONE else p },
@@ -1845,8 +1580,16 @@ jobs:
               Box(modifier = Modifier.fillMaxWidth().aspectRatio(21f / 9f)
                   .clip(RoundedCornerShape(6.dp)).background(Color.Black)
                   .border(1.dp, Neon.CYAN.copy(alpha = 0.55f), RoundedCornerShape(6.dp))) {
-                  VideoDeckView(deck = deckA, alpha = 1f, transition = transition, accentColor = Neon.CYAN, modifier = Modifier.fillMaxSize())
-                  VideoDeckView(deck = deckB, alpha = 1f - videoCrossfader, transition = transition, accentColor = Neon.MAGENTA, modifier = Modifier.fillMaxSize())
+                  VideoDeckView(
+                      deck = deckA, progress = videoCrossfader, isIncoming = false,
+                      transition = transition, accentColor = Neon.CYAN, showScratchOverlay = true,
+                      modifier = Modifier.fillMaxSize()
+                  )
+                  VideoDeckView(
+                      deck = deckB, progress = videoCrossfader, isIncoming = true,
+                      transition = transition, accentColor = Neon.MAGENTA, showScratchOverlay = true,
+                      modifier = Modifier.fillMaxSize()
+                  )
                   Box(modifier = Modifier.align(Alignment.TopStart).padding(5.dp)
                       .clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.6f))
                       .border(1.dp, Neon.CYAN.copy(alpha = 0.7f), RoundedCornerShape(50))
@@ -1856,7 +1599,7 @@ jobs:
                   Box(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 4.dp)
                       .clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.55f))
                       .padding(horizontal = 8.dp, vertical = 2.dp)) {
-                      Text("VIDEO MIX", color = Color.White.copy(alpha = 0.85f), fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
+                      Text(transition.name, color = Color.White.copy(alpha = 0.9f), fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
                   }
                   Row(modifier = Modifier.align(Alignment.TopEnd).padding(5.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                       Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(if (deckA.isPlaying) Neon.LIVE else Color(0x4000E5FF)))
@@ -1876,15 +1619,19 @@ jobs:
                       colors = SliderDefaults.colors(thumbColor = Neon.CYAN,
                           activeTrackColor = accentA.copy(alpha = 0.7f),
                           inactiveTrackColor = accentB.copy(alpha = 0.7f)),
-                      modifier = Modifier.weight(1f).height(18.dp))
+                      modifier = Modifier.width(120.dp).height(18.dp))
                   Text("\u25B6", color = accentB, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                  for (t in VideoTransition.values()) {
-                      val sel = t == transition
-                      Box(modifier = Modifier.clip(RoundedCornerShape(50))
-                          .background(if (sel) Neon.CYAN.copy(alpha = 0.3f) else Neon.BTN_BG)
-                          .border(1.dp, Neon.CYAN.copy(alpha = if (sel) 1f else 0.3f), RoundedCornerShape(50))
-                          .clickable { onTransitionChange(t) }.padding(horizontal = 6.dp, vertical = 2.dp)) {
-                          Text(t.name, color = Neon.CYAN, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+                  Row(modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+                      horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                      for (t in VideoTransition.values()) {
+                          val sel = t == transition
+                          Box(modifier = Modifier.clip(RoundedCornerShape(50))
+                              .background(if (sel) Neon.CYAN.copy(alpha = 0.35f) else Neon.BTN_BG)
+                              .border(if (sel) 1.5.dp else 1.dp, Neon.CYAN.copy(alpha = if (sel) 1f else 0.3f), RoundedCornerShape(50))
+                              .clickable { onTransitionChange(t) }
+                              .padding(horizontal = 8.dp, vertical = 3.dp)) {
+                              Text(t.name, color = Neon.CYAN, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+                          }
                       }
                   }
               }
@@ -2120,27 +1867,6 @@ jobs:
           }
 
           @Composable
-          private fun AiStemDrawer(
-              aiLoading: Boolean, aiReady: Boolean, aiProgress: String, aiDone: Boolean,
-              onLoadModel: () -> Unit, onSeparate: () -> Unit,
-              onEnableVocalRemoval: () -> Unit, onEnableBeatRemoval: () -> Unit
-          ) {
-              Column(modifier = Modifier.fillMaxWidth()
-                  .clip(RoundedCornerShape(10.dp)).background(Neon.PANEL_DARK)
-                  .border(1.dp, Neon.LIME.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
-                  .padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                  Text("AI STEM SEPARATOR", color = Neon.LIME, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
-                  Text(aiProgress, color = Neon.TEXT, fontSize = 9.sp, maxLines = 2)
-                  Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                      LibBtn(if (aiReady) "MODEL OK" else "LOAD AI", Neon.LIME, onLoadModel, Modifier.weight(1f))
-                      LibBtn("RUN AI", Neon.ORANGE, onSeparate, Modifier.weight(1f))
-                      LibBtn("VOCAL OFF", Neon.PURPLE, onEnableVocalRemoval, Modifier.weight(1f))
-                      LibBtn("BEAT OFF", Neon.RED, onEnableBeatRemoval, Modifier.weight(1f))
-                  }
-              }
-          }
-
-          @Composable
           private fun FxDrawer(engine: AudioEngine, deckA: Int) {
               var echoOn by remember { mutableStateOf(false) }
               var filterOn by remember { mutableStateOf(false) }
@@ -2198,7 +1924,6 @@ jobs:
               Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                   BarBtn("\u2630 LIB", Neon.CYAN, activePanel == BottomPanel.LIBRARY) { onTogglePanel(BottomPanel.LIBRARY) }
                   BarBtn("SAMPLER", Neon.MAGENTA, activePanel == BottomPanel.SAMPLER) { onTogglePanel(BottomPanel.SAMPLER) }
-                  BarBtn("AI", Neon.LIME, activePanel == BottomPanel.AI) { onTogglePanel(BottomPanel.AI) }
                   Spacer(Modifier.weight(1f))
                   for (id in 2..5) {
                       val isA = id == activeDeckA; val isB = id == activeDeckB
@@ -2214,6 +1939,7 @@ jobs:
                   }
                   Spacer(Modifier.weight(1f))
                   BarBtn("FX", Neon.PURPLE, activePanel == BottomPanel.FX) { onTogglePanel(BottomPanel.FX) }
+                  BarBtn("SET", Neon.CYAN, false) { }
               }
           }
 
@@ -2258,7 +1984,6 @@ jobs:
           .cxx
           *.apk
           *.aab
-          *.onnx
           EOF
 
       - name: Setup Gradle
@@ -2274,7 +1999,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "v6.0: ONNX Runtime + HTDemucs AI stem separation (vocal + beat removal)" || echo "nothing"
+          git commit -m "v6.1 fix: removed deprecated android.bundle.enableUncompressedNativeLibs" || echo "nothing"
           git push
 
       - name: Set up JDK 17
@@ -2289,6 +2014,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: DJProMixer-v60-debug
+          name: DJProMixer-v61-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: warn
