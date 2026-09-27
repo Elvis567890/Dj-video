@@ -1,4 +1,4 @@
-name: Build Ultimate DJ Pro
+name: Build ULTIMATE
 
 on:
   workflow_dispatch:
@@ -45,7 +45,7 @@ jobs:
               repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
               repositories { google(); mavenCentral() }
           }
-          rootProject.name = "UltimateDJ"
+          rootProject.name = "ULTIMATE"
           include(":app")
           EOF
 
@@ -82,14 +82,14 @@ jobs:
               id("org.jetbrains.kotlin.android")
           }
           android {
-              namespace = "com.djpro.mixer"
+              namespace = "com.ultimate.dj"
               compileSdk = 34
               defaultConfig {
                   applicationId = "com.ultimate.dj"
                   minSdk = 24
                   targetSdk = 34
-                  versionCode = 40
-                  versionName = "3.0.0"
+                  versionCode = 31
+                  versionName = "3.1.0"
               }
               buildTypes { release { isMinifyEnabled = false } }
               compileOptions {
@@ -191,7 +191,7 @@ jobs:
           cat > app/src/main/res/values/strings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
-              <string name="app_name">Ultimate DJ Pro</string>
+              <string name="app_name">ULTIMATE</string>
           </resources>
           EOF
 
@@ -250,8 +250,8 @@ jobs:
 
       - name: Neon theme
         run: |
-          cat > app/src/main/java/com/djpro/mixer/NeonTheme.kt << 'EOF'
-          package com.djpro.mixer
+          cat > app/src/main/java/com/ultimate/dj/NeonTheme.kt << 'EOF'
+          package com.ultimate.dj
           import androidx.compose.ui.graphics.Color
           object Neon {
               val BG = Color(0xFF04040A)
@@ -279,8 +279,8 @@ jobs:
 
       - name: DeviceCapabilities
         run: |
-          cat > app/src/main/java/com/djpro/mixer/DeviceCapabilities.kt << 'EOF'
-          package com.djpro.mixer
+          cat > app/src/main/java/com/ultimate/dj/DeviceCapabilities.kt << 'EOF'
+          package com.ultimate.dj
           import android.app.ActivityManager
           import android.content.Context
           object DeviceCapabilities {
@@ -299,8 +299,8 @@ jobs:
 
       - name: DSP processors
         run: |
-          cat > app/src/main/java/com/djpro/mixer/dsp/EchoAudioProcessor.kt << 'EOF'
-          package com.djpro.mixer.dsp
+          cat > app/src/main/java/com/ultimate/dj/dsp/EchoAudioProcessor.kt << 'EOF'
+          package com.ultimate.dj.dsp
           import androidx.media3.common.C
           import androidx.media3.common.audio.AudioProcessor
           import androidx.media3.common.audio.BaseAudioProcessor
@@ -334,8 +334,8 @@ jobs:
           }
           EOF
 
-          cat > app/src/main/java/com/djpro/mixer/dsp/FilterAudioProcessor.kt << 'EOF'
-          package com.djpro.mixer.dsp
+          cat > app/src/main/java/com/ultimate/dj/dsp/FilterAudioProcessor.kt << 'EOF'
+          package com.ultimate.dj.dsp
           import androidx.media3.common.C
           import androidx.media3.common.audio.AudioProcessor
           import androidx.media3.common.audio.BaseAudioProcessor
@@ -369,8 +369,8 @@ jobs:
           }
           EOF
 
-          cat > app/src/main/java/com/djpro/mixer/dsp/VocalRemovalProcessor.kt << 'EOF'
-          package com.djpro.mixer.dsp
+          cat > app/src/main/java/com/ultimate/dj/dsp/VocalRemovalProcessor.kt << 'EOF'
+          package com.ultimate.dj.dsp
           import androidx.media3.common.C
           import androidx.media3.common.audio.AudioProcessor
           import androidx.media3.common.audio.BaseAudioProcessor
@@ -400,8 +400,8 @@ jobs:
           }
           EOF
 
-          cat > app/src/main/java/com/djpro/mixer/dsp/EqProcessor.kt << 'EOF'
-          package com.djpro.mixer.dsp
+          cat > app/src/main/java/com/ultimate/dj/dsp/EqProcessor.kt << 'EOF'
+          package com.ultimate.dj.dsp
           import androidx.media3.common.C
           import androidx.media3.common.audio.AudioProcessor
           import androidx.media3.common.audio.BaseAudioProcessor
@@ -446,8 +446,8 @@ jobs:
           }
           EOF
 
-          cat > app/src/main/java/com/djpro/mixer/dsp/MasterLimiterProcessor.kt << 'EOF'
-          package com.djpro.mixer.dsp
+          cat > app/src/main/java/com/ultimate/dj/dsp/MasterLimiterProcessor.kt << 'EOF'
+          package com.ultimate.dj.dsp
           import androidx.media3.common.C
           import androidx.media3.common.audio.AudioProcessor
           import androidx.media3.common.audio.BaseAudioProcessor
@@ -473,8 +473,8 @@ jobs:
           }
           EOF
 
-          cat > app/src/main/java/com/djpro/mixer/dsp/KeyLockProcessor.kt << 'EOF'
-          package com.djpro.mixer.dsp
+          cat > app/src/main/java/com/ultimate/dj/dsp/KeyLockProcessor.kt << 'EOF'
+          package com.ultimate.dj.dsp
           import androidx.media3.common.C
           import androidx.media3.common.audio.AudioProcessor
           import androidx.media3.common.audio.BaseAudioProcessor
@@ -495,7 +495,6 @@ jobs:
                   if (!enabled || speed == 1f) {
                       out.put(inputBuffer)
                   } else {
-                      // Simple linear crossfade resample (approximate pitch preservation)
                       var i = 0
                       while (inputBuffer.remaining() >= 2) {
                           val s = inputBuffer.short
@@ -513,8 +512,8 @@ jobs:
           }
           EOF
 
-          cat > app/src/main/java/com/djpro/mixer/dsp/GainProcessor.kt << 'EOF'
-          package com.djpro.mixer.dsp
+          cat > app/src/main/java/com/ultimate/dj/dsp/GainProcessor.kt << 'EOF'
+          package com.ultimate.dj.dsp
           import androidx.media3.common.C
           import androidx.media3.common.audio.AudioProcessor
           import androidx.media3.common.audio.BaseAudioProcessor
@@ -539,15 +538,14 @@ jobs:
           }
           EOF
 
-      - name: Analyzer
+      - name: Analyzers
         run: |
-          cat > app/src/main/java/com/djpro/mixer/audio/BeatAnalyzer.kt << 'EOF'
-          package com.djpro.mixer.audio
+          cat > app/src/main/java/com/ultimate/dj/audio/BeatAnalyzer.kt << 'EOF'
+          package com.ultimate.dj.audio
           import android.media.MediaExtractor
           import android.media.MediaFormat
           import java.nio.ByteBuffer
           import java.nio.ByteOrder
-          import kotlin.math.abs
           import kotlin.math.sqrt
           object BeatAnalyzer {
               fun analyze(uri: String): Float {
@@ -592,13 +590,11 @@ jobs:
               }
               private fun estimateBpm(energies: List<Float>, sampleRate: Int, hopSize: Int): Float {
                   if (energies.size < 100) return 120f
-                  // Onset detection: positive energy differences
                   val onsets = FloatArray(energies.size)
                   for (i in 1 until energies.size) {
                       val diff = energies[i] - energies[i - 1]
                       onsets[i] = if (diff > 0) diff else 0f
                   }
-                  // Autocorrelation on onsets
                   val minLag = (sampleRate * 0.3f / hopSize).toInt()
                   val maxLag = (sampleRate * 1.0f / hopSize).toInt()
                   var bestLag = 0; var bestScore = 0f
@@ -614,13 +610,15 @@ jobs:
           }
           EOF
 
-          cat > app/src/main/java/com/djpro/mixer/audio/KeyDetector.kt << 'EOF'
-          package com.djpro.mixer.audio
+          cat > app/src/main/java/com/ultimate/dj/audio/KeyDetector.kt << 'EOF'
+          package com.ultimate.dj.audio
           import android.media.MediaExtractor
           import android.media.MediaFormat
           import java.nio.ByteBuffer
           import java.nio.ByteOrder
           import kotlin.math.cos
+          import kotlin.math.log
+          import kotlin.math.roundToInt
           import kotlin.math.sin
           object KeyDetector {
               private val NOTE_NAMES = listOf("C","C#","D","D#","E","F","F#","G","G#","A","A#","B")
@@ -644,7 +642,7 @@ jobs:
                       val fftSize = 2048
                       val buf = ByteBuffer.allocate(fftSize * 2).order(ByteOrder.LITTLE_ENDIAN)
                       var frames = 0
-                      while (frames < 400) {
+                      while (frames < 200) {
                           buf.clear()
                           val n = extractor.readSampleData(buf, 0)
                           if (n < 0) break
@@ -665,7 +663,6 @@ jobs:
               }
               private fun accumulateChroma(samples: FloatArray, sr: Int, chroma: FloatArray) {
                   val n = samples.size
-                  // Simple DFT on a subset of bins in low-mid range
                   for (k in 1 until n / 4) {
                       val freq = k.toFloat() * sr / n
                       if (freq < 80f || freq > 2000f) continue
@@ -679,14 +676,12 @@ jobs:
                           j += step
                       }
                       val mag = re * re + im * im
-                      val midi = 69.0 + 12.0 * Math.log(freq / 440.0) / Math.log(2.0)
+                      val midi = 69.0 + 12.0 * log(freq / 440.0) / log(2.0)
                       val pc = ((midi.roundToInt() % 12) + 12) % 12
                       chroma[pc] += mag
                   }
               }
-              private fun Float.roundToInt(): Int = kotlin.math.round(this).toInt()
               private fun pickKey(chroma: FloatArray): Result {
-                  // Find strongest pitch class
                   var maxIdx = 0; var maxVal = 0f
                   for (i in 0 until 12) if (chroma[i] > maxVal) { maxVal = chroma[i]; maxIdx = i }
                   val major = isMajor(chroma, maxIdx)
@@ -695,7 +690,6 @@ jobs:
                   return Result(keyName, camelot)
               }
               private fun isMajor(chroma: FloatArray, root: Int): Boolean {
-                  // Major has strong 3rd (root+4), minor has strong minor 3rd (root+3)
                   val third = chroma[(root + 4) % 12]
                   val minorThird = chroma[(root + 3) % 12]
                   return third >= minorThird
@@ -708,8 +702,8 @@ jobs:
           }
           EOF
 
-          cat > app/src/main/java/com/djpro/mixer/audio/WaveformExtractor.kt << 'EOF'
-          package com.djpro.mixer.audio
+          cat > app/src/main/java/com/ultimate/dj/audio/WaveformExtractor.kt << 'EOF'
+          package com.ultimate.dj.audio
           import android.media.MediaExtractor
           import android.media.MediaFormat
           import java.nio.ByteBuffer
@@ -746,7 +740,6 @@ jobs:
                           }
                           peaks.add(maxAbs / 32768f)
                           reads++
-                          // Skip a few samples to cover whole track
                           repeat(3) { extractor.advance() }
                       }
                       extractor.release()
@@ -765,8 +758,8 @@ jobs:
 
       - name: DeckPlayer
         run: |
-          cat > app/src/main/java/com/djpro/mixer/audio/DeckPlayer.kt << 'EOF'
-          package com.djpro.mixer.audio
+          cat > app/src/main/java/com/ultimate/dj/audio/DeckPlayer.kt << 'EOF'
+          package com.ultimate.dj.audio
           import android.content.Context
           import androidx.compose.runtime.getValue
           import androidx.compose.runtime.mutableFloatStateOf
@@ -781,13 +774,13 @@ jobs:
           import androidx.media3.exoplayer.ExoPlayer
           import androidx.media3.exoplayer.audio.AudioSink
           import androidx.media3.exoplayer.audio.DefaultAudioSink
-          import com.djpro.mixer.dsp.EchoAudioProcessor
-          import com.djpro.mixer.dsp.EqProcessor
-          import com.djpro.mixer.dsp.FilterAudioProcessor
-          import com.djpro.mixer.dsp.GainProcessor
-          import com.djpro.mixer.dsp.KeyLockProcessor
-          import com.djpro.mixer.dsp.MasterLimiterProcessor
-          import com.djpro.mixer.dsp.VocalRemovalProcessor
+          import com.ultimate.dj.dsp.EchoAudioProcessor
+          import com.ultimate.dj.dsp.EqProcessor
+          import com.ultimate.dj.dsp.FilterAudioProcessor
+          import com.ultimate.dj.dsp.GainProcessor
+          import com.ultimate.dj.dsp.KeyLockProcessor
+          import com.ultimate.dj.dsp.MasterLimiterProcessor
+          import com.ultimate.dj.dsp.VocalRemovalProcessor
           import kotlinx.coroutines.CoroutineScope
           import kotlinx.coroutines.Dispatchers
           import kotlinx.coroutines.Job
@@ -906,10 +899,6 @@ jobs:
                       player.seekTo(finalPos)
                       if (wasPlayingBeforeScratch) player.play()
                       scratching = false; scratchRate = 1f; scratchVelocity = 0f
-                      if (slipMode) {
-                          val target = slipAnchorMs + (System.currentTimeMillis() - slipAnchorMs)
-                          player.seekTo(target.coerceIn(0L, dur))
-                      }
                   } catch (_: Throwable) { scratching = false }
               }
               fun spinback() {
@@ -956,7 +945,6 @@ jobs:
                           val beatMs = (60000f / bpm).toLong()
                           val totalMs = beatMs * beats
                           val startMs = player.currentPosition
-                          // Reverse playback by seeking backwards rapidly
                           val steps = 30
                           for (i in 0 until steps) {
                               val pos = startMs - (totalMs * i / steps)
@@ -972,7 +960,8 @@ jobs:
                   try {
                       val beatMs = (60000f / bpm).toLong()
                       val jump = beatMs * beats
-                      val target = (positionMs() + jump).coerceIn(0L, durationMs().takeIf { it > 0 } ?: Long.MAX_VALUE)
+                      val dur = durationMs().takeIf { it > 0 } ?: Long.MAX_VALUE
+                      val target = (positionMs() + jump).coerceIn(0L, dur)
                       player.seekTo(target)
                   } catch (_: Throwable) {}
               }
@@ -1002,7 +991,8 @@ jobs:
                           }
                           val elapsed = System.currentTimeMillis() - startWall
                           val resumePos = anchorMs + elapsed
-                          player.seekTo(resumePos.coerceIn(0L, durationMs().takeIf { it > 0 } ?: Long.MAX_VALUE))
+                          val dur = durationMs().takeIf { it > 0 } ?: Long.MAX_VALUE
+                          player.seekTo(resumePos.coerceIn(0L, dur))
                           if (!wasPlaying) player.pause()
                       } catch (_: Throwable) {}
                       loopRollActive = false
@@ -1035,8 +1025,8 @@ jobs:
 
       - name: SampleSynth
         run: |
-          cat > app/src/main/java/com/djpro/mixer/audio/SampleSynth.kt << 'EOF'
-          package com.djpro.mixer.audio
+          cat > app/src/main/java/com/ultimate/dj/audio/SampleSynth.kt << 'EOF'
+          package com.ultimate.dj.audio
           import android.media.AudioAttributes
           import android.media.AudioFormat
           import android.media.AudioTrack
@@ -1167,8 +1157,8 @@ jobs:
 
       - name: SampleStore and SampleFilePlayer
         run: |
-          cat > app/src/main/java/com/djpro/mixer/audio/SampleStore.kt << 'EOF'
-          package com.djpro.mixer.audio
+          cat > app/src/main/java/com/ultimate/dj/audio/SampleStore.kt << 'EOF'
+          package com.ultimate.dj.audio
           import android.content.Context
           import android.net.Uri
           object SampleStore {
@@ -1193,8 +1183,8 @@ jobs:
           }
           EOF
 
-          cat > app/src/main/java/com/djpro/mixer/audio/SampleFilePlayer.kt << 'EOF'
-          package com.djpro.mixer.audio
+          cat > app/src/main/java/com/ultimate/dj/audio/SampleFilePlayer.kt << 'EOF'
+          package com.ultimate.dj.audio
           import android.content.Context
           import android.media.AudioAttributes
           import android.media.MediaPlayer
@@ -1223,8 +1213,8 @@ jobs:
 
       - name: AudioEngine
         run: |
-          cat > app/src/main/java/com/djpro/mixer/audio/AudioEngine.kt << 'EOF'
-          package com.djpro.mixer.audio
+          cat > app/src/main/java/com/ultimate/dj/audio/AudioEngine.kt << 'EOF'
+          package com.ultimate.dj.audio
           import android.content.Context
           import kotlin.math.cos
           import kotlin.math.sin
@@ -1315,8 +1305,8 @@ jobs:
 
       - name: Video files
         run: |
-          cat > app/src/main/java/com/djpro/mixer/video/RecordingService.kt << 'EOF'
-          package com.djpro.mixer.video
+          cat > app/src/main/java/com/ultimate/dj/video/RecordingService.kt << 'EOF'
+          package com.ultimate.dj.video
           import android.app.Notification
           import android.app.NotificationChannel
           import android.app.NotificationManager
@@ -1334,9 +1324,9 @@ jobs:
                   val cid = "dj_recording"
                   val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                      nm.createNotificationChannel(NotificationChannel(cid, "Ultimate Recording", NotificationManager.IMPORTANCE_LOW))
+                      nm.createNotificationChannel(NotificationChannel(cid, "ULTIMATE Recording", NotificationManager.IMPORTANCE_LOW))
                   val n: Notification = NotificationCompat.Builder(this, cid)
-                      .setContentTitle("Ultimate DJ Pro").setContentText("Recording mix")
+                      .setContentTitle("ULTIMATE").setContentText("Recording mix")
                       .setSmallIcon(android.R.drawable.presence_video_online).setOngoing(true).build()
                   val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
                       ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0
@@ -1347,8 +1337,8 @@ jobs:
           }
           EOF
 
-          cat > app/src/main/java/com/djpro/mixer/video/MixRecorder.kt << 'EOF'
-          package com.djpro.mixer.video
+          cat > app/src/main/java/com/ultimate/dj/video/MixRecorder.kt << 'EOF'
+          package com.ultimate.dj.video
           import android.content.ContentValues
           import android.content.Context
           import android.content.Intent
@@ -1422,13 +1412,13 @@ jobs:
                       val values = ContentValues().apply {
                           put(MediaStore.Video.Media.DISPLAY_NAME, raw.name)
                           put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
-                          put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/Ultimate DJ")
                           if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                              put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/ULTIMATE")
                               put(MediaStore.Video.Media.IS_PENDING, 1)
                           }
                       }
                       val uri = context.contentResolver.insert(
-                          MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values) ?: return raw.toURI()
+                          MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values) ?: return Uri.fromFile(raw)
                       context.contentResolver.openOutputStream(uri)?.use { out ->
                           raw.inputStream().use { it.copyTo(out) }
                       }
@@ -1443,14 +1433,13 @@ jobs:
                       uri
                   } catch (_: Throwable) { null }
               }
-              private fun File.toURI(): Uri = Uri.fromFile(this)
           }
           EOF
 
       - name: UI VideoDeckView
         run: |
-          cat > app/src/main/java/com/djpro/mixer/ui/VideoDeckView.kt << 'EOF'
-          package com.djpro.mixer.ui
+          cat > app/src/main/java/com/ultimate/dj/ui/VideoDeckView.kt << 'EOF'
+          package com.ultimate.dj.ui
           import android.view.ViewGroup
           import androidx.compose.animation.core.animateFloatAsState
           import androidx.compose.animation.core.tween
@@ -1468,7 +1457,7 @@ jobs:
           import androidx.compose.ui.viewinterop.AndroidView
           import androidx.media3.ui.AspectRatioFrameLayout
           import androidx.media3.ui.PlayerView
-          import com.djpro.mixer.audio.DeckPlayer
+          import com.ultimate.dj.audio.DeckPlayer
           import kotlin.math.abs
           import kotlin.math.sin
           import kotlin.random.Random
@@ -1596,8 +1585,8 @@ jobs:
 
       - name: UI AudioVisualizer
         run: |
-          cat > app/src/main/java/com/djpro/mixer/ui/AudioVisualizer.kt << 'EOF'
-          package com.djpro.mixer.ui
+          cat > app/src/main/java/com/ultimate/dj/ui/AudioVisualizer.kt << 'EOF'
+          package com.ultimate.dj.ui
           import androidx.compose.animation.core.LinearEasing
           import androidx.compose.animation.core.RepeatMode
           import androidx.compose.animation.core.animateFloat
@@ -1624,7 +1613,7 @@ jobs:
           import androidx.compose.ui.text.font.FontWeight
           import androidx.compose.ui.unit.dp
           import androidx.compose.ui.unit.sp
-          import com.djpro.mixer.Neon
+          import com.ultimate.dj.Neon
           import kotlin.math.abs
           import kotlin.math.sin
           @Composable
@@ -1679,8 +1668,8 @@ jobs:
 
       - name: UI MetalJogWheel
         run: |
-          cat > app/src/main/java/com/djpro/mixer/ui/MetalJogWheel.kt << 'EOF'
-          package com.djpro.mixer.ui
+          cat > app/src/main/java/com/ultimate/dj/ui/MetalJogWheel.kt << 'EOF'
+          package com.ultimate.dj.ui
           import androidx.compose.animation.core.LinearEasing
           import androidx.compose.animation.core.RepeatMode
           import androidx.compose.animation.core.animateFloat
@@ -1750,60 +1739,8 @@ jobs:
 
       - name: UI Waveforms
         run: |
-          cat > app/src/main/java/com/djpro/mixer/ui/BeatgridWaveform.kt << 'EOF'
-          package com.djpro.mixer.ui
-          import androidx.compose.foundation.Canvas
-          import androidx.compose.foundation.layout.fillMaxWidth
-          import androidx.compose.foundation.layout.height
-          import androidx.compose.runtime.Composable
-          import androidx.compose.ui.Modifier
-          import androidx.compose.ui.geometry.Offset
-          import androidx.compose.ui.graphics.Color
-          import androidx.compose.ui.graphics.StrokeCap
-          import androidx.compose.ui.unit.dp
-          @Composable
-          fun BeatgridWaveform(
-              accent: Color,
-              waveform: FloatArray,
-              bpm: Float,
-              progress: Float,
-              modifier: Modifier = Modifier,
-              barCount: Int = 140
-          ) {
-              Canvas(modifier = modifier.fillMaxWidth().height(50.dp)) {
-                  val w = size.width; val h = size.height
-                  val n = if (waveform.isNotEmpty()) waveform.size else barCount
-                  val step = w / n; val barW = (step * 0.62f).coerceAtLeast(1.0f); val mid = h / 2f
-                  // Beat grid lines
-                  if (bpm > 0f) {
-                      val beatsPerBar = 4
-                      val totalBars = 32
-                      val pixelsPerBar = w / totalBars
-                      var i = 0
-                      while (i < totalBars) {
-                          val x = i * pixelsPerBar
-                          val isDownbeat = i % beatsPerBar == 0
-                          drawLine(accent.copy(alpha = if (isDownbeat) 0.55f else 0.25f),
-                              Offset(x, 0f), Offset(x, h), if (isDownbeat) 1.5f else 0.8f)
-                          i++
-                      }
-                  }
-                  // Waveform
-                  for (i in 0 until n) {
-                      val base = if (waveform.isNotEmpty()) waveform[i].coerceIn(0.02f, 1f) else 0.3f
-                      val amp = base * (h * 0.46f); val x = i * step + step / 2f
-                      drawLine(accent, Offset(x, mid - amp), Offset(x, mid + amp), barW, StrokeCap.Round)
-                  }
-                  // Playhead
-                  val px = w * progress.coerceIn(0f, 1f)
-                  drawLine(Color.White, Offset(px, 0f), Offset(px, h), 2f)
-                  drawCircle(Color.White, 4f, Offset(px, h / 2f))
-              }
-          }
-          EOF
-
-          cat > app/src/main/java/com/djpro/mixer/ui/SplitWaveform.kt << 'EOF'
-          package com.djpro.mixer.ui
+          cat > app/src/main/java/com/ultimate/dj/ui/SplitWaveform.kt << 'EOF'
+          package com.ultimate.dj.ui
           import androidx.compose.foundation.Canvas
           import androidx.compose.foundation.layout.Column
           import androidx.compose.foundation.layout.fillMaxWidth
@@ -1823,7 +1760,6 @@ jobs:
               modifier: Modifier = Modifier
           ) {
               Column(modifier = modifier.fillMaxWidth()) {
-                  // Top: full overview
                   Canvas(modifier = Modifier.fillMaxWidth().height(28.dp)) {
                       val w = size.width; val h = size.height
                       val n = if (waveform.isNotEmpty()) waveform.size else 140
@@ -1836,7 +1772,6 @@ jobs:
                       val px = w * progress.coerceIn(0f, 1f)
                       drawLine(Color.White, Offset(px, 0f), Offset(px, h), 2f)
                   }
-                  // Bottom: zoomed scroll
                   Canvas(modifier = Modifier.fillMaxWidth().height(28.dp)) {
                       val w = size.width; val h = size.height
                       val n = if (waveform.isNotEmpty()) waveform.size else 140
@@ -1859,8 +1794,8 @@ jobs:
 
       - name: UI Faders
         run: |
-          cat > app/src/main/java/com/djpro/mixer/ui/VolumeFader.kt << 'EOF'
-          package com.djpro.mixer.ui
+          cat > app/src/main/java/com/ultimate/dj/ui/VolumeFader.kt << 'EOF'
+          package com.ultimate.dj.ui
           import androidx.compose.foundation.Canvas
           import androidx.compose.foundation.gestures.detectDragGestures
           import androidx.compose.foundation.layout.Box
@@ -1903,8 +1838,8 @@ jobs:
           }
           EOF
 
-          cat > app/src/main/java/com/djpro/mixer/ui/MasterVu.kt << 'EOF'
-          package com.djpro.mixer.ui
+          cat > app/src/main/java/com/ultimate/dj/ui/MasterVu.kt << 'EOF'
+          package com.ultimate.dj.ui
           import androidx.compose.animation.core.LinearEasing
           import androidx.compose.animation.core.RepeatMode
           import androidx.compose.animation.core.animateFloat
@@ -1948,8 +1883,8 @@ jobs:
 
       - name: UI Knob and Scratch
         run: |
-          cat > app/src/main/java/com/djpro/mixer/ui/KnobSmall.kt << 'EOF'
-          package com.djpro.mixer.ui
+          cat > app/src/main/java/com/ultimate/dj/ui/KnobSmall.kt << 'EOF'
+          package com.ultimate.dj.ui
           import androidx.compose.foundation.Canvas
           import androidx.compose.foundation.gestures.detectDragGestures
           import androidx.compose.foundation.layout.Box
@@ -2008,8 +1943,8 @@ jobs:
           }
           EOF
 
-          cat > app/src/main/java/com/djpro/mixer/ui/ScratchOverlay.kt << 'EOF'
-          package com.djpro.mixer.ui
+          cat > app/src/main/java/com/ultimate/dj/ui/ScratchOverlay.kt << 'EOF'
+          package com.ultimate.dj.ui
           import androidx.compose.animation.core.LinearEasing
           import androidx.compose.animation.core.RepeatMode
           import androidx.compose.animation.core.animateFloat
@@ -2035,7 +1970,7 @@ jobs:
           import androidx.compose.ui.text.font.FontWeight
           import androidx.compose.ui.unit.dp
           import androidx.compose.ui.unit.sp
-          import com.djpro.mixer.Neon
+          import com.ultimate.dj.Neon
           import kotlin.math.abs
           import kotlin.random.Random
           @Composable
@@ -2090,8 +2025,8 @@ jobs:
 
       - name: UI DeckStrip and PadGrid
         run: |
-          cat > app/src/main/java/com/djpro/mixer/ui/DeckStrip.kt << 'EOF'
-          package com.djpro.mixer.ui
+          cat > app/src/main/java/com/ultimate/dj/ui/DeckStrip.kt << 'EOF'
+          package com.ultimate.dj.ui
           import androidx.compose.foundation.background
           import androidx.compose.foundation.border
           import androidx.compose.foundation.clickable
@@ -2106,8 +2041,8 @@ jobs:
           import androidx.compose.ui.text.font.FontWeight
           import androidx.compose.ui.unit.dp
           import androidx.compose.ui.unit.sp
-          import com.djpro.mixer.Neon
-          import com.djpro.mixer.audio.DeckPlayer
+          import com.ultimate.dj.Neon
+          import com.ultimate.dj.audio.DeckPlayer
           @Composable
           fun DeckStrip(
               decks: List<DeckPlayer>,
@@ -2163,8 +2098,8 @@ jobs:
           }
           EOF
 
-          cat > app/src/main/java/com/djpro/mixer/ui/PadGrid.kt << 'EOF'
-          package com.djpro.mixer.ui
+          cat > app/src/main/java/com/ultimate/dj/ui/PadGrid.kt << 'EOF'
+          package com.ultimate.dj.ui
           import android.content.Context
           import android.net.Uri
           import androidx.compose.foundation.background
@@ -2185,10 +2120,10 @@ jobs:
           import androidx.compose.ui.text.font.FontWeight
           import androidx.compose.ui.unit.dp
           import androidx.compose.ui.unit.sp
-          import com.djpro.mixer.Neon
-          import com.djpro.mixer.audio.SampleFilePlayer
-          import com.djpro.mixer.audio.SampleStore
-          import com.djpro.mixer.audio.SampleSynth
+          import com.ultimate.dj.Neon
+          import com.ultimate.dj.audio.SampleFilePlayer
+          import com.ultimate.dj.audio.SampleStore
+          import com.ultimate.dj.audio.SampleSynth
           enum class PadMode { SAMPLER, HOTCUE, LOOP, STEMS }
           private val PAD_NAMES = listOf("KICK", "SNARE", "HIHAT", "CLAP", "PERC", "RISER", "LASER", "SIREN")
           @Composable
@@ -2283,10 +2218,10 @@ jobs:
           }
           EOF
 
-      - name: LibraryBrowser
+      - name: LibraryScanner and Browser
         run: |
-          cat > app/src/main/java/com/djpro/mixer/audio/LibraryScanner.kt << 'EOF'
-          package com.djpro.mixer.audio
+          cat > app/src/main/java/com/ultimate/dj/audio/LibraryScanner.kt << 'EOF'
+          package com.ultimate.dj.audio
           import android.content.Context
           import android.database.Cursor
           import android.provider.MediaStore
@@ -2301,7 +2236,6 @@ jobs:
           object LibraryScanner {
               fun scan(context: Context, query: String = ""): List<Track> {
                   val out = mutableListOf<Track>()
-                  // Audio
                   val audioProj = arrayOf(
                       MediaStore.Audio.Media._ID,
                       MediaStore.Audio.Media.TITLE,
@@ -2333,8 +2267,8 @@ jobs:
           }
           EOF
 
-          cat > app/src/main/java/com/djpro/mixer/ui/LibraryBrowser.kt << 'EOF'
-          package com.djpro.mixer.ui
+          cat > app/src/main/java/com/ultimate/dj/ui/LibraryBrowser.kt << 'EOF'
+          package com.ultimate.dj.ui
           import android.content.Context
           import androidx.compose.foundation.background
           import androidx.compose.foundation.border
@@ -2353,9 +2287,9 @@ jobs:
           import androidx.compose.ui.text.font.FontWeight
           import androidx.compose.ui.unit.dp
           import androidx.compose.ui.unit.sp
-          import com.djpro.mixer.Neon
-          import com.djpro.mixer.audio.LibraryScanner
-          import com.djpro.mixer.audio.Track
+          import com.ultimate.dj.Neon
+          import com.ultimate.dj.audio.LibraryScanner
+          import com.ultimate.dj.audio.Track
           import kotlinx.coroutines.Dispatchers
           import kotlinx.coroutines.withContext
           @Composable
@@ -2409,8 +2343,8 @@ jobs:
 
       - name: MainActivity and MainScreen
         run: |
-          cat > app/src/main/java/com/djpro/mixer/MainActivity.kt << 'EOF'
-          package com.djpro.mixer
+          cat > app/src/main/java/com/ultimate/dj/MainActivity.kt << 'EOF'
+          package com.ultimate.dj
           import android.os.Bundle
           import androidx.activity.ComponentActivity
           import androidx.activity.compose.setContent
@@ -2420,8 +2354,8 @@ jobs:
           import androidx.compose.material3.MaterialTheme
           import androidx.compose.ui.Modifier
           import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-          import com.djpro.mixer.audio.AudioEngine
-          import com.djpro.mixer.video.MixRecorder
+          import com.ultimate.dj.audio.AudioEngine
+          import com.ultimate.dj.video.MixRecorder
           class MainActivity : ComponentActivity() {
               private lateinit var engine: AudioEngine
               private lateinit var recorder: MixRecorder
@@ -2445,8 +2379,8 @@ jobs:
           }
           EOF
 
-          cat > app/src/main/java/com/djpro/mixer/MainScreen.kt << 'EOF'
-          package com.djpro.mixer
+          cat > app/src/main/java/com/ultimate/dj/MainScreen.kt << 'EOF'
+          package com.ultimate.dj
           import android.app.Activity
           import android.content.Intent
           import android.net.Uri
@@ -2456,9 +2390,7 @@ jobs:
           import androidx.compose.foundation.background
           import androidx.compose.foundation.border
           import androidx.compose.foundation.clickable
-          import androidx.compose.foundation.horizontalScroll
           import androidx.compose.foundation.layout.*
-          import androidx.compose.foundation.rememberScrollState
           import androidx.compose.foundation.shape.CircleShape
           import androidx.compose.foundation.shape.RoundedCornerShape
           import androidx.compose.material3.Slider
@@ -2475,9 +2407,9 @@ jobs:
           import androidx.compose.ui.text.style.TextOverflow
           import androidx.compose.ui.unit.dp
           import androidx.compose.ui.unit.sp
-          import com.djpro.mixer.audio.*
-          import com.djpro.mixer.ui.*
-          import com.djpro.mixer.video.MixRecorder
+          import com.ultimate.dj.audio.*
+          import com.ultimate.dj.ui.*
+          import com.ultimate.dj.video.MixRecorder
           import kotlinx.coroutines.delay
           private const val SAMPLE_A = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
           private const val SAMPLE_B = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
@@ -2537,7 +2469,7 @@ jobs:
                   if (recording) {
                       val uri = recorder.stop()
                       recording = false; recordingTime = 0
-                      if (uri != null) Toast.makeText(context, "Saved: Movies/Ultimate DJ/${recorder.lastSavedName}", Toast.LENGTH_LONG).show()
+                      if (uri != null) Toast.makeText(context, "Saved: Movies/ULTIMATE/${recorder.lastSavedName}", Toast.LENGTH_LONG).show()
                       else Toast.makeText(context, "Recording failed", Toast.LENGTH_SHORT).show()
                   } else {
                       recorder.buildIntent()?.let { recordLauncher.launch(it) }
@@ -2583,7 +2515,8 @@ jobs:
                   Spacer(Modifier.height(6.dp))
                   VideoStrip(deckA, deckB, videoCrossfader, videoTransition)
                   Spacer(Modifier.height(4.dp))
-                  VideoControlsRow(videoCrossfader, { videoCrossfader = it }, accentA, accentB, videoTransition, { videoTransition = it }, keyLockOn, { keyLockOn = it; engine.setKeyLock(it) },
+                  VideoControlsRow(videoCrossfader, { videoCrossfader = it }, accentA, accentB, videoTransition, { videoTransition = it },
+                      keyLockOn, { keyLockOn = it; engine.setKeyLock(it) },
                       fxChainFilter, { fxChainFilter = it; engine.setFilter(it) },
                       fxChainEcho, { fxChainEcho = it; engine.setEcho(it) })
                   Spacer(Modifier.height(8.dp))
@@ -2636,8 +2569,8 @@ jobs:
                              onRecord: () -> Unit, onClub: () -> Unit, onShare: () -> Unit, onOpen: () -> Unit) {
               Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                   Column {
-                      Text("ULTIMATE", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Black, letterSpacing = 8.sp)
-                      Text("PRO DJ STUDIO", color = Neon.CYAN.copy(alpha = 0.7f), fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 4.sp)
+                      Text("ULTIMATE", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Black, letterSpacing = 10.sp)
+                      Text("DJ STUDIO", color = Neon.CYAN.copy(alpha = 0.7f), fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 5.sp)
                   }
                   Spacer(Modifier.weight(1f))
                   if (isLowEnd) {
@@ -2770,7 +2703,7 @@ jobs:
                       .clickable { onFxEcho(!fxEcho) }.padding(horizontal = 8.dp, vertical = 3.dp)) {
                       Text("ECHO", color = Neon.CYAN, fontSize = 7.sp, fontWeight = FontWeight.Bold)
                   }
-                  Row(modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+                  androidx.compose.foundation.layout.Row(modifier = Modifier.weight(1f).androidx.compose.foundation.horizontalScroll(androidx.compose.foundation.rememberScrollState()),
                       horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                       for (t in VideoTransition.entries) {
                           val sel = t == transition
@@ -2896,13 +2829,13 @@ jobs:
                   }
                   Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                       for (i in 0..3) {
-                          val has = deck.cuePoints.getOrNull(i) ?: -1L >= 0
+                          val has = deck.cuePoints.getOrNull(i)?.let { it >= 0 } ?: false
                           CuePad(i, accent, has, { engine.setCue(deckIndex, i) }, { engine.jumpCue(deckIndex, i) }, Modifier.weight(1f))
                       }
                   }
                   Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                       for (i in 4..7) {
-                          val has = deck.cuePoints.getOrNull(i) ?: -1L >= 0
+                          val has = deck.cuePoints.getOrNull(i)?.let { it >= 0 } ?: false
                           CuePad(i, accent, has, { engine.setCue(deckIndex, i) }, { engine.jumpCue(deckIndex, i) }, Modifier.weight(1f))
                       }
                   }
@@ -3033,7 +2966,7 @@ jobs:
                   .border(1.dp, Neon.PURPLE.copy(alpha = 0.5f), RoundedCornerShape(14.dp)).padding(8.dp),
                   horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                   FxPad("ECHO", Neon.CYAN, echoOn, { echoOn = !echoOn; engine.setEcho(echoOn) }, Modifier.weight(1f))
-                  FxPad("FLT LP", Neon.ORANGE, filterOn && !filterHP, { filterOn = !filterOn || (filterOn && filterHP); engine.setFilter(filterOn); if (filterOn) { filterHP = false; engine.setFilterHighPass(false) } }, Modifier.weight(1f))
+                  FxPad("FLT LP", Neon.ORANGE, filterOn && !filterHP, { filterOn = true; filterHP = false; engine.setFilter(true); engine.setFilterHighPass(false) }, Modifier.weight(1f))
                   FxPad("FLT HP", Neon.ORANGE, filterOn && filterHP, { filterOn = true; filterHP = true; engine.setFilter(true); engine.setFilterHighPass(true) }, Modifier.weight(1f))
                   FxPad("ROLL", Neon.LIME, false, { engine.toggleLoop(deckA, 1) }, Modifier.weight(1f))
                   FxPad("CENS", Neon.RED, false, { engine.censor(deckA, 4) }, Modifier.weight(1f))
@@ -3130,7 +3063,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Ultimate-debug
+          name: ULTIMATE-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: warn
 
@@ -3140,5 +3073,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git diff --cached --quiet || git commit -m "Ultimate DJ Pro v3.0.0: real waveform, real BPM, keylock, beat jump, loop roll, slip, censor, FX chain, sampler banks, library browser, recording saves to gallery + share"
+          git diff --cached --quiet || git commit -m "ULTIMATE v3.1.0: renamed app, fixed MixRecorder URI bug, all features"
           git push || echo "push failed"
