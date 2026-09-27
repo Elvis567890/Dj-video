@@ -1,6 +1,5 @@
 package com.djpro.mixer.ui
-
-import android.view.LayoutInflater
+import android.view.ViewGroup
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -15,15 +14,13 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
-import com.djpro.mixer.R
 import com.djpro.mixer.audio.DeckPlayer
 import kotlin.math.abs
 import kotlin.math.sin
 import kotlin.random.Random
-
 enum class VideoTransition { CROSSFADE, ZOOM, WIPE, SLIDE, FLIP, GLITCH, STROBE, SPIN, BURN }
-
 @Composable
 fun VideoDeckView(
     deck: DeckPlayer, progress: Float, isIncoming: Boolean,
@@ -76,16 +73,22 @@ fun VideoDeckView(
                     rotationY = rotY; rotationZ = rotZ
                     cameraDistance = camDist * density
                 },
-            factory = { ctx ->
-                val view = LayoutInflater.from(ctx)
-                    .inflate(R.layout.player_view, null) as PlayerView
-                view.player = deck.player
-                view.useController = false
-                view.setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
-                view
-            }
+            factory = { c ->
+                PlayerView(c).apply {
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                    useController = false
+                    setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
+                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                    setShutterBackgroundColor(android.graphics.Color.BLACK)
+                    player = deck.player
+                }
+            },
+            update = { view -> view.player = deck.player },
+            onRelease = { view -> view.player = null }
         )
-
         if (smoothT > 0.05f && alpha > 0.15f) {
             when (transition) {
                 VideoTransition.GLITCH -> GlitchOverlay(accentColor, smoothT, progress)
@@ -100,7 +103,6 @@ fun VideoDeckView(
         }
     }
 }
-
 @Composable
 private fun GlitchOverlay(accent: Color, intensity: Float, progress: Float) {
     Canvas(modifier = Modifier.fillMaxSize()) {
@@ -119,13 +121,8 @@ private fun GlitchOverlay(accent: Color, intensity: Float, progress: Float) {
             }
             drawRect(color = col, topLeft = Offset(xOff, y), size = Size(w, barH))
         }
-        if (intensity > 0.6f) {
-            drawRect(color = Color.Red.copy(alpha = 0.18f * intensity), topLeft = Offset(-6f, 0f), size = Size(w * 0.4f, h))
-            drawRect(color = Color.Cyan.copy(alpha = 0.18f * intensity), topLeft = Offset(w * 0.6f + 6f, 0f), size = Size(w * 0.4f, h))
-        }
     }
 }
-
 @Composable
 private fun StrobeOverlay(accent: Color, intensity: Float, progress: Float) {
     val flash = (sin(progress * 95f) * 0.5f + 0.5f).coerceIn(0f, 1f)
@@ -135,7 +132,6 @@ private fun StrobeOverlay(accent: Color, intensity: Float, progress: Float) {
         drawRect(color = accent.copy(alpha = a * 0.35f))
     }
 }
-
 @Composable
 private fun BurnOverlay(accent: Color, intensity: Float) {
     Canvas(modifier = Modifier.fillMaxSize()) {

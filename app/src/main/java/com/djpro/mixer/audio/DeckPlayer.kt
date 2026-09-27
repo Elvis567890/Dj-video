@@ -16,22 +16,24 @@ import androidx.media3.exoplayer.audio.DefaultAudioSink
 import com.djpro.mixer.dsp.EchoAudioProcessor
 import com.djpro.mixer.dsp.EqProcessor
 import com.djpro.mixer.dsp.FilterAudioProcessor
+import com.djpro.mixer.dsp.KeyLockProcessor
 import com.djpro.mixer.dsp.MasterLimiterProcessor
 import com.djpro.mixer.dsp.VocalRemovalProcessor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-
 class DeckPlayer(val index: Int, context: Context) {
     val echo = EchoAudioProcessor()
     val filter = FilterAudioProcessor()
     val vocal = VocalRemovalProcessor()
     val eq = EqProcessor()
     val limiter = MasterLimiterProcessor()
+    val keyLock = KeyLockProcessor()
     private val audioSink: AudioSink = DefaultAudioSink.Builder()
-        .setAudioProcessors(arrayOf<AudioProcessor>(eq, echo, filter, vocal, limiter)).build()
+        .setAudioProcessors(arrayOf<AudioProcessor>(eq, echo, filter, vocal, keyLock, limiter)).build()
     private val renderersFactory = object : DefaultRenderersFactory(context) {
         override fun buildAudioSink(context: Context, enableFloatOutput: Boolean,
                                     enableAudioTrackPlaybackParams: Boolean): AudioSink = audioSink
@@ -58,15 +60,12 @@ class DeckPlayer(val index: Int, context: Context) {
     private val scope = CoroutineScope(Dispatchers.Main + Job())
     private var effectJob: Job? = null
     private var loopJob: Job? = null
-
     init {
         player.addListener(object : Player.Listener {
             override fun onTracksChanged(tracks: Tracks) {
                 var foundVideo = false
                 for (group in tracks.groups) {
-                    if (group.type == C.TRACK_TYPE_VIDEO && group.isSupported) {
-                        foundVideo = true; break
-                    }
+                    if (group.type == C.TRACK_TYPE_VIDEO && group.isSupported) { foundVideo = true; break }
                 }
                 hasVideo = foundVideo
             }
@@ -76,12 +75,14 @@ class DeckPlayer(val index: Int, context: Context) {
             }
         })
     }
-
     fun load(uri: String, displayName: String = "Loaded") {
         try {
             hasVideo = false
             player.setMediaItem(MediaItem.fromUri(uri)); player.prepare()
-            isLoaded = true; bpm = 120f + (0..16).random(); loadedName = displayName
+            isLoaded = true; loadedName = displayName
+            scope.launch {
+                try { bpm = BeatAnalyzer.analyze(uri) } catch (_: Throwable) { bpm = 120f }
+            }
         } catch (_: Throwable) { isLoaded = false }
     }
     fun play() { try { player.play(); isPlaying = true } catch (_: Throwable) {} }
@@ -89,7 +90,8 @@ class DeckPlayer(val index: Int, context: Context) {
     fun toggle() { if (isPlaying) pause() else play() }
     fun setVolume(v: Float) { try { player.volume = v.coerceIn(0f, 1f) } catch (_: Throwable) {} }
     fun currentSpeed(): Float = try { player.playbackParameters.speed } catch (_: Throwable) { 1f }
-
+    fun setSpeed(s: Float) { try { player.setPlaybackSpeed(s.coerceIn(0.25f, 4f)) } catch (_: Throwable) {} }
+    fun setKeyLock(on: Boolean) { keyLock.enabled = on }
     fun beginScratch() {
         try {
             wasPlayingBeforeScratch = player.isPlaying
@@ -178,7 +180,7 @@ class DeckPlayer(val index: Int, context: Context) {
     fun positionMs(): Long = try { player.currentPosition } catch (_: Throwable) { 0L }
     fun durationMs(): Long = try { val d = player.duration; if (d > 0) d else 0L } catch (_: Throwable) { 0L }
     fun release() {
-        effectJob?.cancel(); loopJob?.cancel()
+        effectJob?.cancel(); loopJob?.cancel(); scope.cancel()
         try { player.release() } catch (_: Throwable) {}
         try { audioSink.release() } catch (_: Throwable) {}
     }

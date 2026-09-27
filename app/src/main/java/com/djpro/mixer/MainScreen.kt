@@ -1,5 +1,4 @@
 package com.djpro.mixer
-
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
@@ -8,76 +7,36 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.djpro.mixer.audio.AudioEngine
-import com.djpro.mixer.audio.CrossfaderMode
-import com.djpro.mixer.audio.DeckPlayer
-import com.djpro.mixer.audio.SampleFilePlayer
-import com.djpro.mixer.audio.SampleStore
-import com.djpro.mixer.audio.SampleSynth
-import com.djpro.mixer.ui.AudioVisualizer
-import com.djpro.mixer.ui.BeatgridWaveform
-import com.djpro.mixer.ui.KnobSmall
-import com.djpro.mixer.ui.MasterVu
-import com.djpro.mixer.ui.MetalJogWheel
-import com.djpro.mixer.ui.VideoDeckView
-import com.djpro.mixer.ui.VideoTransition
-import com.djpro.mixer.ui.VolumeFader
+import com.djpro.mixer.audio.*
+import com.djpro.mixer.ui.*
 import com.djpro.mixer.video.MixRecorder
 import kotlinx.coroutines.delay
-
-private const val SAMPLE_VIDEO_1 = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
-private const val SAMPLE_VIDEO_2 = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
-private val PAD_NAMES = listOf("KICK", "SNARE", "HIHAT", "CLAP", "PERC", "RISER", "LASER", "SIREN")
-
+private const val SAMPLE_A = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+private const val SAMPLE_B = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
 private enum class BottomPanel { NONE, SAMPLER, FX, LIBRARY }
-
 @Composable
 fun MainScreen(engine: AudioEngine, recorder: MixRecorder, activity: Activity) {
     val context = LocalContext.current
+    val isLowEnd = remember { DeviceCapabilities.isLowEnd(context) }
     var audioCrossfader by remember { mutableFloatStateOf(0.5f) }
     var videoCrossfader by remember { mutableFloatStateOf(0.5f) }
     var crossMode by remember { mutableStateOf(CrossfaderMode.FADE) }
@@ -91,8 +50,9 @@ fun MainScreen(engine: AudioEngine, recorder: MixRecorder, activity: Activity) {
     var pendingDeckId by remember { mutableStateOf<Int?>(null) }
     var pendingPadIndex by remember { mutableStateOf<Int?>(null) }
     var recording by remember { mutableStateOf(false) }
+    var recordingTime by remember { mutableLongStateOf(0L) }
     var padRev by remember { mutableLongStateOf(0L) }
-
+    var keyLockOn by remember { mutableStateOf(false) }
     val recordLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -100,7 +60,6 @@ fun MainScreen(engine: AudioEngine, recorder: MixRecorder, activity: Activity) {
             recording = recorder.start(result.resultCode, result.data!!)
         }
     }
-
     val filePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -112,7 +71,6 @@ fun MainScreen(engine: AudioEngine, recorder: MixRecorder, activity: Activity) {
         }
     }
     fun pickFile(id: Int) { pendingDeckId = id; filePicker.launch(arrayOf("video/*", "audio/*")) }
-
     val samplePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -123,37 +81,42 @@ fun MainScreen(engine: AudioEngine, recorder: MixRecorder, activity: Activity) {
         }
     }
     fun pickSampleForPad(idx: Int) { pendingPadIndex = idx; samplePicker.launch(arrayOf("audio/*")) }
-
     fun toggleRecording() {
-        if (recording) { recorder.stop(); recording = false }
+        if (recording) { recorder.stop(); recording = false; recordingTime = 0 }
         else { recorder.buildIntent()?.let { recordLauncher.launch(it) } }
     }
-
     LaunchedEffect(Unit) {
         while (true) {
             anyPlaying = engine.decks.any { it.isPlaying }
             bpmMaster = engine.deckA().bpm
-            delay(400)
+            if (recording) recordingTime += 1000
+            delay(1000)
         }
     }
-
     val deckA = engine.decks[activeDeckA]
     val deckB = engine.decks[activeDeckB]
-    val accentA = Neon.DECK_COLORS[activeDeckA]
-    val accentB = Neon.DECK_COLORS[activeDeckB]
-
+    val accentA = Neon.DECK_COLORS[activeDeckA % Neon.DECK_COLORS.size]
+    val accentB = Neon.DECK_COLORS[activeDeckB % Neon.DECK_COLORS.size]
     Column(modifier = Modifier.fillMaxSize()
         .background(if (clubMode) Neon.CLUB_BG else Neon.BG)
         .padding(horizontal = 8.dp, vertical = 6.dp)) {
-
-        TopBar(recording, clubMode, { toggleRecording() }, { clubMode = !clubMode })
-
+        TopBar(recording, recordingTime, clubMode, isLowEnd, { toggleRecording() }, { clubMode = !clubMode })
+        Spacer(Modifier.height(6.dp))
+        DeckStrip(
+            decks = engine.decks,
+            activeA = activeDeckA,
+            activeB = activeDeckB,
+            onSelect = { idx ->
+                if (idx == activeDeckA || idx == activeDeckB) return@DeckStrip
+                activeDeckA = idx
+            },
+            onLoadInto = { idx -> pickFile(idx) }
+        )
         Spacer(Modifier.height(6.dp))
         VideoStrip(deckA, deckB, videoCrossfader, videoTransition)
         Spacer(Modifier.height(4.dp))
-        VideoControlsRow(videoCrossfader, { videoCrossfader = it }, accentA, accentB, videoTransition, { videoTransition = it })
+        VideoControlsRow(videoCrossfader, { videoCrossfader = it }, accentA, accentB, videoTransition, { videoTransition = it }, keyLockOn, { keyLockOn = it; engine.setKeyLock(it) })
         Spacer(Modifier.height(8.dp))
-
         Row(modifier = Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             DeckPanel(deck = deckA, accent = accentA, label = "DECK A",
                 onPickFile = { pickFile(activeDeckA) }, onPlay = { engine.togglePlay(activeDeckA) },
@@ -166,6 +129,7 @@ fun MainScreen(engine: AudioEngine, recorder: MixRecorder, activity: Activity) {
                 onScratchEnd = { engine.endScratch(activeDeckA) },
                 onEqChange = { l, m, h -> engine.setEq(activeDeckA, l, m, h) },
                 onStemsChange = { d, b, o -> engine.setStemMutes(d, b, o) },
+                onSpeedChange = { s -> engine.setSpeed(activeDeckA, s) },
                 modifier = Modifier.weight(1f).fillMaxHeight())
             CenterMixer(engine, audioCrossfader, { audioCrossfader = it; engine.setCrossfader(it) },
                 crossMode, { crossMode = it; engine.setCrossfaderMode(it) }, anyPlaying, bpmMaster,
@@ -181,52 +145,49 @@ fun MainScreen(engine: AudioEngine, recorder: MixRecorder, activity: Activity) {
                 onScratchEnd = { engine.endScratch(activeDeckB) },
                 onEqChange = { l, m, h -> engine.setEq(activeDeckB, l, m, h) },
                 onStemsChange = { d, b, o -> engine.setStemMutes(d, b, o) },
+                onSpeedChange = { s -> engine.setSpeed(activeDeckB, s) },
                 modifier = Modifier.weight(1f).fillMaxHeight())
         }
-
         Spacer(Modifier.height(6.dp))
-
         if (bottomPanel == BottomPanel.SAMPLER) {
             SamplerDrawer(context, padRev,
-                onPlayPad = { idx, name ->
-                    val a = SampleStore.getAssignedUri(context, idx)
-                    if (a != null) SampleFilePlayer.play(context, Uri.parse(a))
-                    else SampleSynth.play(name)
-                },
-                onAssignPad = { idx -> pickSampleForPad(idx) },
-                onClearPad = { idx -> SampleStore.assign(context, idx, null); padRev = System.currentTimeMillis() })
+                onRequestImport = { padIndex -> pickSampleForPad(padIndex) },
+                onClearPad = { padIndex ->
+                    SampleStore.assign(context, padIndex, null)
+                    padRev = System.currentTimeMillis()
+                })
             Spacer(Modifier.height(6.dp))
         } else if (bottomPanel == BottomPanel.FX) {
             FxDrawer(engine, activeDeckA); Spacer(Modifier.height(6.dp))
         } else if (bottomPanel == BottomPanel.LIBRARY) {
             LibraryDrawer(
                 { pickFile(activeDeckA) }, { pickFile(activeDeckB) },
-                { engine.loadDeck(activeDeckA, SAMPLE_VIDEO_1, "Sample A") },
-                { engine.loadDeck(activeDeckB, SAMPLE_VIDEO_2, "Sample B") })
+                { engine.loadDeck(activeDeckA, SAMPLE_A, "Sample A") },
+                { engine.loadDeck(activeDeckB, SAMPLE_B, "Sample B") })
             Spacer(Modifier.height(6.dp))
         }
-
         BottomBar(bottomPanel, { p -> bottomPanel = if (bottomPanel == p) BottomPanel.NONE else p },
             activeDeckA, activeDeckB,
             { id -> engine.swapToA(id); activeDeckA = id },
             { id -> engine.swapToB(id); activeDeckB = id },
-            { id -> val url = if (id % 2 == 0) SAMPLE_VIDEO_1 else SAMPLE_VIDEO_2; engine.loadDeck(id, url, "Sample ${id + 1}") })
+            { id -> val url = if (id % 2 == 0) SAMPLE_A else SAMPLE_B; engine.loadDeck(id, url, "Sample ${id + 1}") })
     }
 }
-
 @Composable
-private fun TopBar(recording: Boolean, clubMode: Boolean, onRecord: () -> Unit, onClub: () -> Unit) {
+private fun TopBar(recording: Boolean, recordingTime: Long, clubMode: Boolean, isLowEnd: Boolean, onRecord: () -> Unit, onClub: () -> Unit) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Box(modifier = Modifier.size(34.dp).clip(CircleShape).background(Neon.PANEL)
-            .border(1.dp, Neon.CYAN.copy(alpha = 0.55f), CircleShape), contentAlignment = Alignment.Center) {
-            Icon(Icons.Filled.Menu, "menu", tint = Neon.CYAN, modifier = Modifier.size(18.dp))
-        }
-        Spacer(Modifier.width(12.dp))
         Column {
             Text("ULTIMATE", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Black, letterSpacing = 8.sp)
             Text("PRO DJ STUDIO", color = Neon.CYAN.copy(alpha = 0.7f), fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 4.sp)
         }
         Spacer(Modifier.weight(1f))
+        if (isLowEnd) {
+            Box(modifier = Modifier.clip(RoundedCornerShape(50)).background(Neon.ORANGE.copy(alpha = 0.2f))
+                .padding(horizontal = 8.dp, vertical = 3.dp)) {
+                Text("LITE MODE", color = Neon.ORANGE, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+            }
+            Spacer(Modifier.width(8.dp))
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.clip(RoundedCornerShape(50))
                 .background(if (recording) Neon.RED.copy(alpha = 0.35f) else Neon.PANEL)
@@ -235,7 +196,8 @@ private fun TopBar(recording: Boolean, clubMode: Boolean, onRecord: () -> Unit, 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(Neon.RED))
                     Spacer(Modifier.width(6.dp))
-                    Text(if (recording) "STOP" else "REC", color = Neon.RED, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                    Text(if (recording) "STOP ${fmt(recordingTime)}" else "REC",
+                        color = Neon.RED, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                 }
             }
             Spacer(Modifier.width(8.dp))
@@ -245,27 +207,19 @@ private fun TopBar(recording: Boolean, clubMode: Boolean, onRecord: () -> Unit, 
                 .clickable { onClub() }.padding(horizontal = 12.dp, vertical = 5.dp)) {
                 Text(if (clubMode) "CLUB ON" else "CLUB", color = Neon.CYAN, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
             }
-            Spacer(Modifier.width(8.dp))
-            Box(modifier = Modifier.size(34.dp).clip(CircleShape).background(Neon.PANEL)
-                .border(1.dp, Neon.CYAN.copy(alpha = 0.55f), CircleShape), contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.Settings, "settings", tint = Neon.CYAN, modifier = Modifier.size(18.dp))
-            }
         }
     }
 }
-
 @Composable
 private fun VideoStrip(deckA: DeckPlayer, deckB: DeckPlayer, videoCrossfader: Float, transition: VideoTransition) {
     Box(modifier = Modifier.fillMaxWidth().aspectRatio(21f / 9f)
         .clip(RoundedCornerShape(10.dp)).background(Color.Black)
         .border(1.dp, Neon.BORDER_SOFT, RoundedCornerShape(10.dp))) {
-
         if (deckA.hasVideo) {
             VideoDeckView(deckA, videoCrossfader, false, transition, Neon.CYAN, true, Modifier.fillMaxSize())
         } else if (deckA.isLoaded) {
             AudioVisualizer(Neon.CYAN, deckA.isPlaying, deckA.loadedName, Modifier.fillMaxSize())
         }
-
         if (deckB.hasVideo) {
             VideoDeckView(deckB, videoCrossfader, true, transition, Neon.MAGENTA, true, Modifier.fillMaxSize())
         } else if (deckB.isLoaded) {
@@ -275,31 +229,27 @@ private fun VideoStrip(deckA: DeckPlayer, deckB: DeckPlayer, videoCrossfader: Fl
                 AudioVisualizer(Neon.MAGENTA, deckB.isPlaying, deckB.loadedName, Modifier.fillMaxSize())
             }
         }
-
         if (!deckA.isLoaded && !deckB.isLoaded) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("LOAD A VIDEO OR AUDIO",
-                        color = Neon.CYAN.copy(alpha = 0.6f), fontSize = 14.sp,
+                    Text("LOAD A VIDEO OR AUDIO", color = Neon.CYAN.copy(alpha = 0.6f), fontSize = 14.sp,
                         fontWeight = FontWeight.Bold, letterSpacing = 6.sp)
                     Spacer(Modifier.height(6.dp))
-                    Text("Tap LOAD on a deck  \u2022  Pick from LIBRARY below",
+                    Text("Tap LOAD on a deck  •  Pick from LIBRARY below",
                         color = Neon.TEXT_FAINT, fontSize = 10.sp, letterSpacing = 2.sp)
                 }
             }
         }
-
         Box(modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
             .clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.55f))
             .border(1.dp, Neon.CYAN.copy(alpha = 0.7f), RoundedCornerShape(50))
             .padding(horizontal = 10.dp, vertical = 3.dp)) {
             Text("MIX", color = Neon.CYAN, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
         }
-
         val modeText = when {
             deckA.hasVideo && deckB.hasVideo -> transition.name
             !deckA.hasVideo && !deckB.hasVideo && deckA.isLoaded && deckB.isLoaded -> "AUDIO MIX"
-            deckA.hasVideo || deckB.hasVideo -> "VIDEO \u2022 AUDIO"
+            deckA.hasVideo || deckB.hasVideo -> "VIDEO • AUDIO"
             else -> "READY"
         }
         Box(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp)
@@ -307,32 +257,35 @@ private fun VideoStrip(deckA: DeckPlayer, deckB: DeckPlayer, videoCrossfader: Fl
             .padding(horizontal = 12.dp, vertical = 3.dp)) {
             Text(modeText, color = Color.White.copy(alpha = 0.95f), fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
         }
-
         Row(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            Box(modifier = Modifier.size(8.dp).clip(CircleShape)
-                .background(if (deckA.isPlaying) Neon.LIVE else Color(0x4000E5FF)))
-            Box(modifier = Modifier.size(8.dp).clip(CircleShape)
-                .background(if (deckB.isPlaying) Neon.LIVE else Color(0x40FF2BD6)))
+            Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(if (deckA.isPlaying) Neon.LIVE else Color(0x4000E5FF)))
+            Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(if (deckB.isPlaying) Neon.LIVE else Color(0x40FF2BD6)))
         }
     }
 }
-
 @Composable
 private fun VideoControlsRow(vcf: Float, onChange: (Float) -> Unit,
                              a: Color, b: Color,
-                             transition: VideoTransition, onTransition: (VideoTransition) -> Unit) {
+                             transition: VideoTransition, onTransition: (VideoTransition) -> Unit,
+                             keyLock: Boolean, onKeyLock: (Boolean) -> Unit) {
     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("\u25C0", color = a, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Text("◀", color = a, fontSize = 11.sp, fontWeight = FontWeight.Bold)
         Slider(value = vcf, onValueChange = onChange,
             colors = SliderDefaults.colors(thumbColor = Neon.CYAN,
                 activeTrackColor = a.copy(alpha = 0.8f),
                 inactiveTrackColor = b.copy(alpha = 0.8f)),
             modifier = Modifier.width(120.dp).height(18.dp))
-        Text("\u25B6", color = b, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Text("▶", color = b, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Box(modifier = Modifier.clip(RoundedCornerShape(50))
+            .background(if (keyLock) Neon.LIME.copy(alpha = 0.3f) else Neon.BTN_BG)
+            .border(1.dp, Neon.LIME.copy(alpha = if (keyLock) 1f else 0.4f), RoundedCornerShape(50))
+            .clickable { onKeyLock(!keyLock) }.padding(horizontal = 8.dp, vertical = 3.dp)) {
+            Text("KEYLOCK", color = Neon.LIME, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+        }
         Row(modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            for (t in VideoTransition.values()) {
+            for (t in VideoTransition.entries) {
                 val sel = t == transition
                 Box(modifier = Modifier.clip(RoundedCornerShape(50))
                     .background(if (sel) Neon.CYAN.copy(alpha = 0.3f) else Neon.BTN_BG)
@@ -344,7 +297,6 @@ private fun VideoControlsRow(vcf: Float, onChange: (Float) -> Unit,
         }
     }
 }
-
 @Composable
 private fun DeckPanel(
     deck: DeckPlayer, accent: Color, label: String,
@@ -354,6 +306,7 @@ private fun DeckPanel(
     onScratchStart: () -> Unit, onScratchMove: (Float) -> Unit, onScratchEnd: () -> Unit,
     onEqChange: (Float, Float, Float) -> Unit,
     onStemsChange: (Boolean, Boolean, Boolean) -> Unit,
+    onSpeedChange: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var positionMs by remember { mutableLongStateOf(0L) }
@@ -365,18 +318,16 @@ private fun DeckPanel(
     var drmMute by remember { mutableStateOf(false) }
     var basMute by remember { mutableStateOf(false) }
     var othMute by remember { mutableStateOf(false) }
+    var pitchVal by remember { mutableFloatStateOf(1f) }
     val isPlaying = deck.isPlaying
     val scratching = deck.scratching
     val speed = deck.currentSpeed()
     val kindTag = if (deck.hasVideo) "VIDEO" else if (deck.isLoaded) "AUDIO" else ""
-
     LaunchedEffect(deck) { while (true) { positionMs = deck.positionMs(); durationMs = deck.durationMs(); delay(400) } }
-
     Column(modifier = modifier.clip(RoundedCornerShape(14.dp))
         .background(if (scratching) accent.copy(alpha = 0.08f) else Neon.PANEL)
         .border(if (scratching) 2.dp else 1.dp, accent.copy(alpha = if (scratching) 1f else 0.5f), RoundedCornerShape(14.dp))
         .padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(if (scratching) Neon.YELLOW else accent))
@@ -392,7 +343,7 @@ private fun DeckPanel(
                     }
                 }
             }
-            Text(when { scratching -> "SCR \u00D7${"%.2f".format(deck.scratchRate)}"; isPlaying -> "LIVE"; else -> "READY" },
+            Text(when { scratching -> "SCR ×${"%.2f".format(deck.scratchRate)}"; isPlaying -> "LIVE"; else -> "READY" },
                 color = when { scratching -> Neon.YELLOW; isPlaying -> Neon.LIVE; else -> Neon.TEXT_FAINT },
                 fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
         }
@@ -401,21 +352,18 @@ private fun DeckPanel(
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("${fmt(positionMs)} / ${fmt(if (durationMs > 0) durationMs else 0L)}",
                 color = accent.copy(alpha = 0.85f), fontSize = 9.sp, fontWeight = FontWeight.Bold)
-            Text("BPM ${"%.1f".format(deck.bpm)} \u2022 ${"%.0f".format(speed * 100)}%",
+            Text("BPM ${"%.1f".format(deck.bpm)} • ${"%.0f".format(speed * 100)}%",
                 color = accent.copy(alpha = 0.75f), fontSize = 9.sp, fontWeight = FontWeight.Bold)
         }
-
         BeatgridWaveform(accent = accent, seed = deck.index * 31 + 7, barCount = 100)
-
         Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
             MetalJogWheel(accent = accent, size = 108.dp, isPlaying = isPlaying,
                 onScratchStart = onScratchStart, onScratchMove = onScratchMove, onScratchEnd = onScratchEnd)
         }
-
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             PillBtn("SYNC", accent, false, onSync, Modifier.weight(1f))
             PillBtn("CUE", accent, false, onCue, Modifier.weight(1f))
-            PillBtn("\u25B6 PLAY", accent, isPlaying, onPlay, Modifier.weight(1.4f))
+            PillBtn("▶ PLAY", accent, isPlaying, onPlay, Modifier.weight(1.4f))
         }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             for (b in intArrayOf(1, 2, 4, 8, 16)) {
@@ -463,6 +411,18 @@ private fun DeckPanel(
                 }
             }
         }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Text("PITCH", color = accent.copy(alpha = 0.8f), fontSize = 8.sp, fontWeight = FontWeight.Bold)
+            Slider(value = pitchVal, onValueChange = {
+                pitchVal = it; onSpeedChange(it * 2f)
+            }, valueRange = 0.25f..2f,
+                colors = SliderDefaults.colors(thumbColor = accent,
+                    activeTrackColor = accent.copy(alpha = 0.7f),
+                    inactiveTrackColor = Neon.BORDER_SOFT),
+                modifier = Modifier.weight(1f).height(20.dp))
+            Text("${"%.2f".format(pitchVal)}×", color = accent, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+        }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             PillBtn("SPIN", accent, false, onSpinback, Modifier.weight(1f))
             PillBtn("BRAKE", accent, false, onBrake, Modifier.weight(1f))
@@ -470,7 +430,6 @@ private fun DeckPanel(
         }
     }
 }
-
 @Composable
 private fun CuePad(index: Int, accent: Color, hasCue: Boolean, onSet: () -> Unit, onJump: () -> Unit, modifier: Modifier = Modifier) {
     Box(modifier = modifier.clip(RoundedCornerShape(6.dp))
@@ -481,7 +440,6 @@ private fun CuePad(index: Int, accent: Color, hasCue: Boolean, onSet: () -> Unit
         Text(if (hasCue) "C${index + 1}" else "+${index + 1}", color = accent, fontSize = 7.sp, fontWeight = FontWeight.Bold)
     }
 }
-
 @Composable
 private fun StemBtn(label: String, accent: Color, active: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Box(modifier = modifier.clip(RoundedCornerShape(6.dp))
@@ -491,7 +449,6 @@ private fun StemBtn(label: String, accent: Color, active: Boolean, onClick: () -
         Text(label, color = accent, fontSize = 7.sp, fontWeight = FontWeight.Bold)
     }
 }
-
 @Composable
 private fun CenterMixer(engine: AudioEngine, acf: Float, onAcf: (Float) -> Unit,
                         cm: CrossfaderMode, onCm: (CrossfaderMode) -> Unit,
@@ -536,56 +493,18 @@ private fun CenterMixer(engine: AudioEngine, acf: Float, onAcf: (Float) -> Unit,
             Text("CUT", color = if (cm == CrossfaderMode.CUT) Neon.CYAN else Neon.TEXT_FAINT,
                 fontSize = 9.sp, fontWeight = FontWeight.Bold,
                 modifier = Modifier.clickable { onCm(CrossfaderMode.CUT) }.padding(horizontal = 6.dp, vertical = 3.dp))
-            Text("\u2502", color = Neon.TEXT_FAINT, fontSize = 9.sp)
+            Text("│", color = Neon.TEXT_FAINT, fontSize = 9.sp)
             Text("FADE", color = if (cm == CrossfaderMode.FADE) Neon.CYAN else Neon.TEXT_FAINT,
                 fontSize = 9.sp, fontWeight = FontWeight.Bold,
                 modifier = Modifier.clickable { onCm(CrossfaderMode.FADE) }.padding(horizontal = 6.dp, vertical = 3.dp))
         }
     }
 }
-
-@Composable
-private fun SamplerDrawer(context: android.content.Context, revision: Long,
-                          onPlayPad: (Int, String) -> Unit,
-                          onAssignPad: (Int) -> Unit,
-                          onClearPad: (Int) -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth().height(90.dp)
-        .clip(RoundedCornerShape(14.dp)).background(Neon.PANEL_GLASS)
-        .border(1.dp, Neon.MAGENTA.copy(alpha = 0.5f), RoundedCornerShape(14.dp)).padding(8.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        for (i in 0 until 8) {
-            val name = PAD_NAMES[i]
-            val accent = if (i % 2 == 0) Neon.MAGENTA else Neon.PURPLE
-            val assigned = remember(i, revision) { SampleStore.getAssignedUri(context, i) }
-            val isCustom = assigned != null
-            Box(modifier = Modifier.weight(1f).fillMaxHeight()
-                .clip(RoundedCornerShape(10.dp))
-                .background(accent.copy(alpha = if (isCustom) 0.25f else 0.12f))
-                .border(if (isCustom) 2.dp else 1.dp, accent.copy(alpha = if (isCustom) 1f else 0.55f), RoundedCornerShape(10.dp))
-                .pointerInput(i, revision) {
-                    detectTapGestures(onTap = { onPlayPad(i, name) }, onLongPress = { onAssignPad(i) })
-                }, contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(name, color = accent, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                    Spacer(Modifier.height(2.dp))
-                    Text(if (isCustom) "CUSTOM" else "SYNTH", color = accent.copy(alpha = 0.75f), fontSize = 6.sp, fontWeight = FontWeight.Bold)
-                }
-                if (isCustom) {
-                    Box(modifier = Modifier.align(Alignment.TopEnd).padding(2.dp)
-                        .size(14.dp).clip(CircleShape).background(Neon.RED.copy(alpha = 0.6f))
-                        .clickable { onClearPad(i) }, contentAlignment = Alignment.Center) {
-                        Text("\u00D7", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
-    }
-}
-
 @Composable
 private fun FxDrawer(engine: AudioEngine, deckA: Int) {
     var echoOn by remember { mutableStateOf(false) }
     var filterOn by remember { mutableStateOf(false) }
+    var vocalOn by remember { mutableStateOf(false) }
     Row(modifier = Modifier.fillMaxWidth().height(84.dp)
         .clip(RoundedCornerShape(14.dp)).background(Neon.PANEL_GLASS)
         .border(1.dp, Neon.PURPLE.copy(alpha = 0.5f), RoundedCornerShape(14.dp)).padding(8.dp),
@@ -595,10 +514,9 @@ private fun FxDrawer(engine: AudioEngine, deckA: Int) {
         FxPad("ROLL", Neon.LIME, false, { engine.toggleLoop(deckA, 1) }, Modifier.weight(1f))
         FxPad("BRAKE", Neon.RED, false, { engine.brake(deckA) }, Modifier.weight(1f))
         FxPad("SPIN", Neon.ORANGE, false, { engine.spinback(deckA) }, Modifier.weight(1f))
-        FxPad("VOCAL", Neon.PURPLE, false, { engine.setVocalRemoval(true) }, Modifier.weight(1f))
+        FxPad("VOCAL", Neon.PURPLE, vocalOn, { vocalOn = !vocalOn; engine.setVocalRemoval(vocalOn) }, Modifier.weight(1f))
     }
 }
-
 @Composable
 private fun FxPad(label: String, accent: Color, active: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Box(modifier = modifier.fillMaxHeight()
@@ -609,20 +527,18 @@ private fun FxPad(label: String, accent: Color, active: Boolean, onClick: () -> 
         Text(label, color = accent, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
     }
 }
-
 @Composable
 private fun LibraryDrawer(onPickForA: () -> Unit, onPickForB: () -> Unit, onLoadSampleA: () -> Unit, onLoadSampleB: () -> Unit) {
     Row(modifier = Modifier.fillMaxWidth().height(84.dp)
         .clip(RoundedCornerShape(14.dp)).background(Neon.PANEL_GLASS)
         .border(1.dp, Neon.CYAN.copy(alpha = 0.5f), RoundedCornerShape(14.dp)).padding(8.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        LibBtn("VIDEO/AUDIO \u2192 A", Neon.CYAN, onPickForA, Modifier.weight(1f))
-        LibBtn("VIDEO/AUDIO \u2192 B", Neon.MAGENTA, onPickForB, Modifier.weight(1f))
+        LibBtn("VIDEO/AUDIO → A", Neon.CYAN, onPickForA, Modifier.weight(1f))
+        LibBtn("VIDEO/AUDIO → B", Neon.MAGENTA, onPickForB, Modifier.weight(1f))
         LibBtn("DEMO A", Neon.LIME, onLoadSampleA, Modifier.weight(1f))
         LibBtn("DEMO B", Neon.ORANGE, onLoadSampleB, Modifier.weight(1f))
     }
 }
-
 @Composable
 private fun LibBtn(label: String, accent: Color, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Box(modifier = modifier.fillMaxHeight()
@@ -632,13 +548,12 @@ private fun LibBtn(label: String, accent: Color, onClick: () -> Unit, modifier: 
         Text(label, color = accent, fontSize = 10.sp, fontWeight = FontWeight.Bold)
     }
 }
-
 @Composable
 private fun BottomBar(activePanel: BottomPanel, onTogglePanel: (BottomPanel) -> Unit,
                       activeDeckA: Int, activeDeckB: Int,
                       onSwapA: (Int) -> Unit, onSwapB: (Int) -> Unit, onLoadSample: (Int) -> Unit) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
-        BarBtn("\u2630 LIB", Neon.CYAN, activePanel == BottomPanel.LIBRARY) { onTogglePanel(BottomPanel.LIBRARY) }
+        BarBtn("☰ LIB", Neon.CYAN, activePanel == BottomPanel.LIBRARY) { onTogglePanel(BottomPanel.LIBRARY) }
         BarBtn("SAMPLER", Neon.MAGENTA, activePanel == BottomPanel.SAMPLER) { onTogglePanel(BottomPanel.SAMPLER) }
         Spacer(Modifier.weight(1f))
         for (id in 2..5) {
@@ -658,7 +573,6 @@ private fun BottomBar(activePanel: BottomPanel, onTogglePanel: (BottomPanel) -> 
         BarBtn("SET", Neon.CYAN, false) { }
     }
 }
-
 @Composable
 private fun BarBtn(label: String, accent: Color, active: Boolean, onClick: () -> Unit) {
     Box(modifier = Modifier.clip(RoundedCornerShape(10.dp))
@@ -668,7 +582,6 @@ private fun BarBtn(label: String, accent: Color, active: Boolean, onClick: () ->
         Text(label, color = accent, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
     }
 }
-
 @Composable
 private fun PillBtn(label: String, accent: Color, active: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Box(modifier = modifier.clip(RoundedCornerShape(50))
@@ -678,7 +591,6 @@ private fun PillBtn(label: String, accent: Color, active: Boolean, onClick: () -
         Text(label, color = if (active) Color.Black else accent, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
     }
 }
-
 private fun fmt(ms: Long): String {
     if (ms <= 0) return "00:00"
     val s = ms / 1000

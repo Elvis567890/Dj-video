@@ -7,10 +7,10 @@ android {
     compileSdk = 34
     defaultConfig {
         applicationId = "com.ultimate.dj"
-        minSdk = 26
+        minSdk = 24
         targetSdk = 34
-        versionCode = 22
-        versionName = "1.0.2"
+        versionCode = 30
+        versionName = "2.0.0"
     }
     buildTypes { release { isMinifyEnabled = false } }
     compileOptions {

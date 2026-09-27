@@ -51,8 +51,8 @@ fun ScratchOverlay(accent: Color, rate: Float, velocity: Float, modifier: Modifi
             drawRect(color = accent.copy(alpha = (0.25f + 0.35f * intensity) * 0.15f))
         }
         CornerBrackets(accent)
-        val displayRate = if (rate < 0f) "\u25C0 REV \u00D7${"%.2f".format(abs(rate))}"
-                          else "\u25B6 \u00D7${"%.2f".format(rate)}"
+        val displayRate = if (rate < 0f) "◀ REV ×${"%.2f".format(abs(rate))}"
+                          else "▶ ×${"%.2f".format(rate)}"
         Box(modifier = Modifier.align(Alignment.TopCenter).padding(top = 6.dp)
             .clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.75f))
             .border(1.5.dp, accent, RoundedCornerShape(50))

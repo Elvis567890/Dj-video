@@ -23,11 +23,9 @@ fun MasterVu(playing: Boolean, modifier: Modifier = Modifier) {
         infiniteRepeatable(tween(2500, easing = LinearEasing), RepeatMode.Restart), label = "phase")
     Canvas(modifier = modifier.width(18.dp).fillMaxHeight()) {
         val w = size.width; val h = size.height
-        val segments = 20
-        val segH = (h - (segments - 1) * 2f) / segments
+        val segments = 20; val segH = (h - (segments - 1) * 2f) / segments
         for (i in 0 until segments) {
-            val y = i * (segH + 2f)
-            val t = 1f - i.toFloat() / segments
+            val y = i * (segH + 2f); val t = 1f - i.toFloat() / segments
             val level = if (playing) (0.55f + 0.45f * sin(phase + i * 0.6f)).coerceIn(0.20f, 1f) else 0.10f
             val lit = t < level
             val color = when {

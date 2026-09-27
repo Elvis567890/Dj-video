@@ -24,9 +24,7 @@ fun BeatgridWaveform(accent: Color, modifier: Modifier = Modifier, barCount: Int
     }
     Canvas(modifier = modifier.fillMaxWidth().height(50.dp)) {
         val w = size.width; val h = size.height
-        val step = w / barCount
-        val barW = (step * 0.62f).coerceAtLeast(1.0f)
-        val mid = h / 2f
+        val step = w / barCount; val barW = (step * 0.62f).coerceAtLeast(1.0f); val mid = h / 2f
         for (g in 0..4) { val y = h * g / 4f; drawLine(accent.copy(alpha = 0.06f), Offset(0f, y), Offset(w, y), 0.8f) }
         var i = 0
         while (i < barCount) { val x = i * step; drawLine(accent.copy(alpha = 0.35f), Offset(x, 0f), Offset(x, h), 1f); i += 8 }

@@ -1,0 +1,175 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.ultimate.dj"
+4    android:versionCode="30"
+5    android:versionName="2.0.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="24"
+9        android:targetSdkVersion="34" />
+10
+11    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+11-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:4:5-75
+11-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:4:22-72
+12    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+12-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:5:5-75
+12-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:5:22-72
+13    <uses-permission
+13-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:6:5-107
+14        android:name="android.permission.READ_EXTERNAL_STORAGE"
+14-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:6:22-77
+15        android:maxSdkVersion="32" />
+15-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:6:78-104
+16    <uses-permission android:name="android.permission.INTERNET" />
+16-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:7:5-67
+16-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:7:22-64
+17    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+17-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:8:5-71
+17-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:8:22-68
+18    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+18-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:9:5-77
+18-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:9:22-74
+19    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+19-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:10:5-94
+19-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:10:22-91
+20    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+20-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:11:5-77
+20-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:11:22-74
+21    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+21-->[androidx.media3:media3-common:1.4.1] /home/runner/.gradle/caches/transforms-4/406640f12b02cbf1a2b0cb410da91922/transformed/media3-common-1.4.1/AndroidManifest.xml:22:5-79
+21-->[androidx.media3:media3-common:1.4.1] /home/runner/.gradle/caches/transforms-4/406640f12b02cbf1a2b0cb410da91922/transformed/media3-common-1.4.1/AndroidManifest.xml:22:22-76
+22
+23    <permission
+23-->[androidx.core:core:1.13.1] /home/runner/.gradle/caches/transforms-4/8e0a0bff2d388b6446750efdf4a5758f/transformed/core-1.13.1/AndroidManifest.xml:22:5-24:47
+24        android:name="com.ultimate.dj.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+24-->[androidx.core:core:1.13.1] /home/runner/.gradle/caches/transforms-4/8e0a0bff2d388b6446750efdf4a5758f/transformed/core-1.13.1/AndroidManifest.xml:23:9-81
+25        android:protectionLevel="signature" />
+25-->[androidx.core:core:1.13.1] /home/runner/.gradle/caches/transforms-4/8e0a0bff2d388b6446750efdf4a5758f/transformed/core-1.13.1/AndroidManifest.xml:24:9-44
+26
+27    <uses-permission android:name="com.ultimate.dj.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+27-->[androidx.core:core:1.13.1] /home/runner/.gradle/caches/transforms-4/8e0a0bff2d388b6446750efdf4a5758f/transformed/core-1.13.1/AndroidManifest.xml:26:5-97
+27-->[androidx.core:core:1.13.1] /home/runner/.gradle/caches/transforms-4/8e0a0bff2d388b6446750efdf4a5758f/transformed/core-1.13.1/AndroidManifest.xml:26:22-94
+28
+29    <application
+29-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:12:5-39:19
+30        android:allowBackup="true"
+30-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:13:9-35
+31        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+31-->[androidx.core:core:1.13.1] /home/runner/.gradle/caches/transforms-4/8e0a0bff2d388b6446750efdf4a5758f/transformed/core-1.13.1/AndroidManifest.xml:28:18-86
+32        android:debuggable="true"
+33        android:extractNativeLibs="false"
+34        android:hardwareAccelerated="true"
+34-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:19:9-43
+35        android:icon="@mipmap/ic_launcher"
+35-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:15:9-43
+36        android:label="@string/app_name"
+36-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:14:9-41
+37        android:largeHeap="true"
+37-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:17:9-33
+38        android:roundIcon="@mipmap/ic_launcher_round"
+38-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:16:9-54
+39        android:theme="@style/Theme.Ultimate"
+39-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:20:9-46
+40        android:usesCleartextTraffic="true" >
+40-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:18:9-44
+41        <activity
+41-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:22:9-33:20
+42            android:name="com.djpro.mixer.MainActivity"
+42-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:23:13-41
+43            android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
+43-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:27:13-81
+44            android:exported="true"
+44-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:24:13-36
+45            android:screenOrientation="landscape"
+45-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:25:13-50
+46            android:theme="@style/Theme.Ultimate.Splash" >
+46-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:26:13-57
+47            <intent-filter>
+47-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:29:13-32:29
+48                <action android:name="android.intent.action.MAIN" />
+48-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:30:17-69
+48-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:30:25-66
+49
+50                <category android:name="android.intent.category.LAUNCHER" />
+50-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:31:17-77
+50-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:31:27-74
+51            </intent-filter>
+52        </activity>
+53
+54        <service
+54-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:34:9-38:58
+55            android:name="com.djpro.mixer.video.RecordingService"
+55-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:35:13-51
+56            android:exported="false"
+56-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:36:13-37
+57            android:foregroundServiceType="mediaProjection|microphone" />
+57-->/home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:37:13-71
+58
+59        <provider
+59-->[androidx.emoji2:emoji2:1.3.0] /home/runner/.gradle/caches/transforms-4/192474c036ec43764acdf6f3e34ae042/transformed/emoji2-1.3.0/AndroidManifest.xml:24:9-32:20
+60            android:name="androidx.startup.InitializationProvider"
+60-->[androidx.emoji2:emoji2:1.3.0] /home/runner/.gradle/caches/transforms-4/192474c036ec43764acdf6f3e34ae042/transformed/emoji2-1.3.0/AndroidManifest.xml:25:13-67
+61            android:authorities="com.ultimate.dj.androidx-startup"
+61-->[androidx.emoji2:emoji2:1.3.0] /home/runner/.gradle/caches/transforms-4/192474c036ec43764acdf6f3e34ae042/transformed/emoji2-1.3.0/AndroidManifest.xml:26:13-68
+62            android:exported="false" >
+62-->[androidx.emoji2:emoji2:1.3.0] /home/runner/.gradle/caches/transforms-4/192474c036ec43764acdf6f3e34ae042/transformed/emoji2-1.3.0/AndroidManifest.xml:27:13-37
+63            <meta-data
+63-->[androidx.emoji2:emoji2:1.3.0] /home/runner/.gradle/caches/transforms-4/192474c036ec43764acdf6f3e34ae042/transformed/emoji2-1.3.0/AndroidManifest.xml:29:13-31:52
+64                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+64-->[androidx.emoji2:emoji2:1.3.0] /home/runner/.gradle/caches/transforms-4/192474c036ec43764acdf6f3e34ae042/transformed/emoji2-1.3.0/AndroidManifest.xml:30:17-75
+65                android:value="androidx.startup" />
+65-->[androidx.emoji2:emoji2:1.3.0] /home/runner/.gradle/caches/transforms-4/192474c036ec43764acdf6f3e34ae042/transformed/emoji2-1.3.0/AndroidManifest.xml:31:17-49
+66            <meta-data
+66-->[androidx.lifecycle:lifecycle-process:2.8.4] /home/runner/.gradle/caches/transforms-4/5b8ea465910fd80be9fa1407ed6ac524/transformed/lifecycle-process-2.8.4/AndroidManifest.xml:29:13-31:52
+67                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+67-->[androidx.lifecycle:lifecycle-process:2.8.4] /home/runner/.gradle/caches/transforms-4/5b8ea465910fd80be9fa1407ed6ac524/transformed/lifecycle-process-2.8.4/AndroidManifest.xml:30:17-78
+68                android:value="androidx.startup" />
+68-->[androidx.lifecycle:lifecycle-process:2.8.4] /home/runner/.gradle/caches/transforms-4/5b8ea465910fd80be9fa1407ed6ac524/transformed/lifecycle-process-2.8.4/AndroidManifest.xml:31:17-49
+69            <meta-data
+69-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/runner/.gradle/caches/transforms-4/4e16cc280eaa0a1f5277c41379c36ea2/transformed/profileinstaller-1.3.1/AndroidManifest.xml:29:13-31:52
+70                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
+70-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/runner/.gradle/caches/transforms-4/4e16cc280eaa0a1f5277c41379c36ea2/transformed/profileinstaller-1.3.1/AndroidManifest.xml:30:17-85
+71                android:value="androidx.startup" />
+71-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/runner/.gradle/caches/transforms-4/4e16cc280eaa0a1f5277c41379c36ea2/transformed/profileinstaller-1.3.1/AndroidManifest.xml:31:17-49
+72        </provider>
+73
+74        <receiver
+74-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/runner/.gradle/caches/transforms-4/4e16cc280eaa0a1f5277c41379c36ea2/transformed/profileinstaller-1.3.1/AndroidManifest.xml:34:9-52:20
+75            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+75-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/runner/.gradle/caches/transforms-4/4e16cc280eaa0a1f5277c41379c36ea2/transformed/profileinstaller-1.3.1/AndroidManifest.xml:35:13-76
+76            android:directBootAware="false"
+76-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/runner/.gradle/caches/transforms-4/4e16cc280eaa0a1f5277c41379c36ea2/transformed/profileinstaller-1.3.1/AndroidManifest.xml:36:13-44
+77            android:enabled="true"
+77-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/runner/.gradle/caches/transforms-4/4e16cc280eaa0a1f5277c41379c36ea2/transformed/profileinstaller-1.3.1/AndroidManifest.xml:37:13-35
+78            android:exported="true"
+78-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/runner/.gradle/caches/transforms-4/4e16cc280eaa0a1f5277c41379c36ea2/transformed/profileinstaller-1.3.1/AndroidManifest.xml:38:13-36
+79            android:permission="android.permission.DUMP" >
+79-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/runner/.gradle/caches/transforms-4/4e16cc280eaa0a1f5277c41379c36ea2/transformed/profileinstaller-1.3.1/AndroidManifest.xml:39:13-57
+80            <intent-filter>
+80-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/runner/.gradle/caches/transforms-4/4e16cc280eaa0a1f5277c41379c36ea2/transformed/profileinstaller-1.3.1/AndroidManifest.xml:40:13-42:29
+81                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
+81-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/runner/.gradle/caches/transforms-4/4e16cc280eaa0a1f5277c41379c36ea2/transformed/profileinstaller-1.3.1/AndroidManifest.xml:41:17-91
+81-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/runner/.gradle/caches/transforms-4/4e16cc280eaa0a1f5277c41379c36ea2/transformed/profileinstaller-1.3.1/AndroidManifest.xml:41:25-88
+82            </intent-filter>
+83            <intent-filter>
+83-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/runner/.gradle/caches/transforms-4/4e16cc280eaa0a1f5277c41379c36ea2/transformed/profileinstaller-1.3.1/AndroidManifest.xml:43:13-45:29
+84                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
+84-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/runner/.gradle/caches/transforms-4/4e16cc280eaa0a1f5277c41379c36ea2/transformed/profileinstaller-1.3.1/AndroidManifest.xml:44:17-85
+84-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/runner/.gradle/caches/transforms-4/4e16cc280eaa0a1f5277c41379c36ea2/transformed/profileinstaller-1.3.1/AndroidManifest.xml:44:25-82
+85            </intent-filter>
+86            <intent-filter>
+86-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/runner/.gradle/caches/transforms-4/4e16cc280eaa0a1f5277c41379c36ea2/transformed/profileinstaller-1.3.1/AndroidManifest.xml:46:13-48:29
+87                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
+87-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/runner/.gradle/caches/transforms-4/4e16cc280eaa0a1f5277c41379c36ea2/transformed/profileinstaller-1.3.1/AndroidManifest.xml:47:17-88
+87-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/runner/.gradle/caches/transforms-4/4e16cc280eaa0a1f5277c41379c36ea2/transformed/profileinstaller-1.3.1/AndroidManifest.xml:47:25-85
+88            </intent-filter>
+89            <intent-filter>
+89-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/runner/.gradle/caches/transforms-4/4e16cc280eaa0a1f5277c41379c36ea2/transformed/profileinstaller-1.3.1/AndroidManifest.xml:49:13-51:29
+90                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
+90-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/runner/.gradle/caches/transforms-4/4e16cc280eaa0a1f5277c41379c36ea2/transformed/profileinstaller-1.3.1/AndroidManifest.xml:50:17-95
+90-->[androidx.profileinstaller:profileinstaller:1.3.1] /home/runner/.gradle/caches/transforms-4/4e16cc280eaa0a1f5277c41379c36ea2/transformed/profileinstaller-1.3.1/AndroidManifest.xml:50:25-92
+91            </intent-filter>
+92        </receiver>
+93    </application>
+94
+95</manifest>

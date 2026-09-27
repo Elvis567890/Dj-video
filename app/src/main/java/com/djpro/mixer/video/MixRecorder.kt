@@ -23,6 +23,7 @@ class MixRecorder(private val context: Context) {
     fun start(resultCode: Int, data: Intent): Boolean {
         if (isRecording) return false
         return try {
+            try { context.startForegroundService(Intent(context, RecordingService::class.java)) } catch (_: Throwable) {}
             val mgr = context.getSystemService(MediaProjectionManager::class.java)
             projection = mgr.getMediaProjection(resultCode, data)
             val metrics = DisplayMetrics()
@@ -57,6 +58,7 @@ class MixRecorder(private val context: Context) {
         virtualDisplay = null
         try { projection?.stop() } catch (_: Throwable) {}
         projection = null
+        try { context.stopService(Intent(context, RecordingService::class.java)) } catch (_: Throwable) {}
         return outputFile
     }
 }

@@ -52,22 +52,16 @@ fun MetalJogWheel(accent: Color, size: Dp, isPlaying: Boolean,
             drawCircle(Brush.linearGradient(listOf(Color(0xFF26262E), Color(0xFF08080F), Color(0xFF26262E)),
                 Offset(0f, 0f), Offset(this.size.width, this.size.height)), r * 0.98f, c)
             drawCircle(accent, r * 0.98f, c, style = Stroke(width = 3f))
-            drawCircle(accent.copy(alpha = 0.35f), r * 0.98f, c, style = Stroke(width = 10f))
             drawCircle(Brush.radialGradient(
                 listOf(Color(0xFFECECF2), Color(0xFFB6B6C2), Color(0xFF868696), Color(0xFF565666)),
                 Offset(cx - r * 0.20f, cy - r * 0.25f), r * 1.10f), r * 0.78f, c)
             for (g in 1..6) drawCircle(Color(0x30FFFFFF), r * (0.30f + g * 0.075f), c, style = Stroke(width = 0.8f))
-            drawCircle(Brush.radialGradient(listOf(Color.Transparent, Color(0x50000000)), c, r * 0.78f), r * 0.78f, c)
             val crossR = r * 0.15f
             drawCircle(Color(0xFF1A1A22), crossR, c)
-            drawCircle(Color(0xFF5A5A66), crossR, c, style = Stroke(width = 1f))
-            drawLine(Color(0xFF9A9AA6), Offset(cx - crossR * 0.6f, cy), Offset(cx + crossR * 0.6f, cy), 1.5f)
-            drawLine(Color(0xFF9A9AA6), Offset(cx, cy - crossR * 0.6f), Offset(cx, cy + crossR * 0.6f), 1.5f)
             val rad = Math.toRadians(displayedAngle.toDouble())
             val dx = (r * 0.88f) * cos(rad).toFloat()
             val dy = (r * 0.88f) * sin(rad).toFloat()
             drawCircle(accent, 4f, Offset(cx + dx, cy + dy))
-            drawLine(accent, c, Offset(cx + dx, cy + dy), 2f, StrokeCap.Round)
         }
     }
 }

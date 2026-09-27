@@ -15,7 +15,7 @@ class AudioEngine(context: Context) {
     val history = mutableListOf<String>()
     init { setCrossfader(0.5f); setMasterVolume(1.0f) }
     fun swapToA(deckId: Int) { if (deckId in decks.indices && deckId != activeDeckB) { activeDeckA = deckId; applyCrossfader() } }
-    fun swapToB(deckId: Int) { if (deckId in decks.indices && deckId != activeDeckB && deckId != activeDeckA) { activeDeckB = deckId; applyCrossfader() } }
+    fun swapToB(deckId: Int) { if (deckId in decks.indices && deckId != activeDeckA) { activeDeckB = deckId; applyCrossfader() } }
     fun deckA(): DeckPlayer = decks[activeDeckA]
     fun deckB(): DeckPlayer = decks[activeDeckB]
     fun setCrossfader(v: Float) { crossfader = v.coerceIn(0f, 1f); applyCrossfader() }
@@ -39,6 +39,7 @@ class AudioEngine(context: Context) {
     fun setEcho(on: Boolean) { echoEnabled = on; decks.forEach { it.echo.enabled = on } }
     fun setFilter(on: Boolean) { filterEnabled = on; decks.forEach { it.filter.enabled = on } }
     fun setVocalRemoval(on: Boolean) { vocalRemovalEnabled = on; decks.forEach { it.vocal.enabled = on } }
+    fun setKeyLock(on: Boolean) { decks.forEach { it.setKeyLock(on) } }
     fun setStemMutes(d: Boolean, b: Boolean, o: Boolean) {
         stemDrumsMuted = d; stemBassMuted = b; stemOtherMuted = o
         val ld = if (b) -26f else if (d) -12f else 0f
@@ -73,5 +74,6 @@ class AudioEngine(context: Context) {
     fun setCue(i: Int, s: Int) { if (i in decks.indices) decks[i].setCue(s) }
     fun jumpCue(i: Int, s: Int) { if (i in decks.indices) decks[i].jumpToCue(s) }
     fun toggleLoop(i: Int, b: Int) { if (i in decks.indices) decks[i].toggleLoop(b) }
+    fun setSpeed(i: Int, s: Float) { if (i in decks.indices) decks[i].setSpeed(s) }
     fun release() { decks.forEach { it.release() } }
 }
