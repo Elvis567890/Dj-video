@@ -344,7 +344,7 @@ jobs:
                   val out = replaceOutputBuffer(inputBuffer.remaining())
                   while (inputBuffer.remaining() >= 2) {
                       val s = inputBuffer.short.toFloat() / 32768f
-                      val limited = tanh(s).toFloat() * ceiling
+                      val limited = tanh(s.toDouble()).toFloat() * ceiling
                       out.putShort((limited * 32767f).toInt().toShort())
                   }
                   out.flip()
@@ -522,7 +522,7 @@ jobs:
           }
           EOF
 
-      - name: SampleSynth.kt (fixed: all Double math)
+      - name: SampleSynth.kt
         run: |
           cat > app/src/main/java/com/djpro/mixer/audio/SampleSynth.kt << 'EOF'
           package com.djpro.mixer.audio
@@ -535,7 +535,6 @@ jobs:
           import kotlinx.coroutines.Job
           import kotlinx.coroutines.launch
           import kotlin.math.PI
-          import kotlin.math.cos
           import kotlin.math.exp
           import kotlin.math.pow
           import kotlin.math.sin
@@ -552,7 +551,7 @@ jobs:
               }
 
               private fun makeKick(): ShortArray {
-                  val n = (SR * 0.45).toInt()
+                  val n = (SR.toDouble() * 0.45).toInt()
                   val buf = ShortArray(n)
                   var phase = 0.0
                   for (i in 0 until n) {
@@ -568,7 +567,7 @@ jobs:
               }
 
               private fun makeSnare(): ShortArray {
-                  val n = (SR * 0.30).toInt()
+                  val n = (SR.toDouble() * 0.30).toInt()
                   val buf = ShortArray(n)
                   var phase = 0.0
                   for (i in 0 until n) {
@@ -585,7 +584,7 @@ jobs:
 
               private fun makeHiHat(open: Boolean = false): ShortArray {
                   val dur = if (open) 0.28 else 0.06
-                  val n = (SR * dur).toInt()
+                  val n = (SR.toDouble() * dur).toInt()
                   val buf = ShortArray(n)
                   var hp1 = 0.0
                   var hp2 = 0.0
@@ -605,7 +604,7 @@ jobs:
               }
 
               private fun makeClap(): ShortArray {
-                  val n = (SR * 0.30).toInt()
+                  val n = (SR.toDouble() * 0.30).toInt()
                   val buf = ShortArray(n)
                   val starts = doubleArrayOf(0.0, 0.010, 0.021, 0.032)
                   for (i in 0 until n) {
@@ -624,7 +623,7 @@ jobs:
               }
 
               private fun makePerc(): ShortArray {
-                  val n = (SR * 0.18).toInt()
+                  val n = (SR.toDouble() * 0.18).toInt()
                   val buf = ShortArray(n)
                   var phase = 0.0
                   for (i in 0 until n) {
@@ -639,7 +638,7 @@ jobs:
 
               private fun makeRiser(): ShortArray {
                   val dur = 1.0
-                  val n = (SR * dur).toInt()
+                  val n = (SR.toDouble() * dur).toInt()
                   val buf = ShortArray(n)
                   var phase = 0.0
                   for (i in 0 until n) {
@@ -656,7 +655,7 @@ jobs:
 
               private fun makeLaser(): ShortArray {
                   val dur = 0.20
-                  val n = (SR * dur).toInt()
+                  val n = (SR.toDouble() * dur).toInt()
                   val buf = ShortArray(n)
                   var phase = 0.0
                   for (i in 0 until n) {
@@ -673,7 +672,7 @@ jobs:
 
               private fun makeSiren(): ShortArray {
                   val dur = 0.9
-                  val n = (SR * dur).toInt()
+                  val n = (SR.toDouble() * dur).toInt()
                   val buf = ShortArray(n)
                   var phase = 0.0
                   for (i in 0 until n) {
@@ -852,13 +851,13 @@ jobs:
               fun setCrossfaderMode(m: CrossfaderMode) { crossfaderMode = m; applyCrossfader() }
               private fun applyCrossfader() {
                   val (a, b) = when (crossfaderMode) {
-                      CrossfaderMode.FADE -> cos(crossfader * Math.PI / 2).toFloat() to sin(crossfader * Math.PI / 2).toFloat()
+                      CrossfaderMode.FADE -> cos(crossfader * Math.PI.toFloat() / 2f) to sin(crossfader * Math.PI.toFloat() / 2f)
                       CrossfaderMode.CUT -> {
                           val zone = 0.05f
                           when {
                               crossfader < 0.5f - zone -> 1f to 0f
                               crossfader > 0.5f + zone -> 0f to 1f
-                              else -> { val t = (crossfader - (0.5f - zone)) / (2 * zone); 1f - t to t }
+                              else -> { val t = (crossfader - (0.5f - zone)) / (2 * zone); (1f - t) to t }
                           }
                       }
                   }
@@ -1033,7 +1032,7 @@ jobs:
           }
           EOF
 
-      - name: VideoDeckView with 9 transitions
+      - name: VideoDeckView.kt
         run: |
           cat > app/src/main/java/com/djpro/mixer/ui/VideoDeckView.kt << 'EOF'
           package com.djpro.mixer.ui
@@ -1186,7 +1185,7 @@ jobs:
           private fun GlitchOverlay(accent: Color, intensity: Float, progress: Float) {
               Canvas(modifier = Modifier.fillMaxSize()) {
                   val w = size.width; val h = size.height
-                  val rnd = Random((progress * 10000).toInt() * 7919)
+                  val rnd = Random((progress * 10000f).toInt() * 7919)
                   val bars = (8 + intensity * 22).toInt()
                   for (i in 0 until bars) {
                       val y = rnd.nextFloat() * h
@@ -1228,7 +1227,7 @@ jobs:
           }
           EOF
 
-      - name: UI components
+      - name: MetalJogWheel.kt
         run: |
           cat > app/src/main/java/com/djpro/mixer/ui/MetalJogWheel.kt << 'EOF'
           package com.djpro.mixer.ui
@@ -1311,6 +1310,8 @@ jobs:
           }
           EOF
 
+      - name: BeatgridWaveform.kt
+        run: |
           cat > app/src/main/java/com/djpro/mixer/ui/BeatgridWaveform.kt << 'EOF'
           package com.djpro.mixer.ui
           import androidx.compose.foundation.Canvas
@@ -1352,6 +1353,8 @@ jobs:
           }
           EOF
 
+      - name: VolumeFader.kt
+        run: |
           cat > app/src/main/java/com/djpro/mixer/ui/VolumeFader.kt << 'EOF'
           package com.djpro.mixer.ui
           import androidx.compose.foundation.Canvas
@@ -1397,6 +1400,8 @@ jobs:
           }
           EOF
 
+      - name: MasterVu.kt
+        run: |
           cat > app/src/main/java/com/djpro/mixer/ui/MasterVu.kt << 'EOF'
           package com.djpro.mixer.ui
           import androidx.compose.animation.core.LinearEasing
@@ -1442,6 +1447,8 @@ jobs:
           }
           EOF
 
+      - name: KnobSmall.kt
+        run: |
           cat > app/src/main/java/com/djpro/mixer/ui/KnobSmall.kt << 'EOF'
           package com.djpro.mixer.ui
           import androidx.compose.foundation.Canvas
@@ -1504,6 +1511,8 @@ jobs:
           }
           EOF
 
+      - name: ScratchOverlay.kt
+        run: |
           cat > app/src/main/java/com/djpro/mixer/ui/ScratchOverlay.kt << 'EOF'
           package com.djpro.mixer.ui
           import androidx.compose.animation.core.LinearEasing
@@ -2302,7 +2311,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "v6.3 fix: SampleSynth all Double math (no Float/Double mismatch)" || echo "nothing"
+          git commit -m "v6.3: all Double math in SampleSynth + clean build" || echo "nothing"
           git push
 
       - name: Set up JDK 17
