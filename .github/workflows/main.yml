@@ -85,8 +85,8 @@ jobs:
                   applicationId = "com.djpro.mixer"
                   minSdk = 26
                   targetSdk = 34
-                  versionCode = 16
-                  versionName = "6.2.0"
+                  versionCode = 17
+                  versionName = "6.3.0"
               }
               buildTypes { release { isMinifyEnabled = false } }
               compileOptions {
@@ -522,7 +522,7 @@ jobs:
           }
           EOF
 
-      - name: SampleSynth.kt (restored)
+      - name: SampleSynth.kt (fixed: all Double math)
         run: |
           cat > app/src/main/java/com/djpro/mixer/audio/SampleSynth.kt << 'EOF'
           package com.djpro.mixer.audio
@@ -535,7 +535,9 @@ jobs:
           import kotlinx.coroutines.Job
           import kotlinx.coroutines.launch
           import kotlin.math.PI
+          import kotlin.math.cos
           import kotlin.math.exp
+          import kotlin.math.pow
           import kotlin.math.sin
           import kotlin.random.Random
 
@@ -544,116 +546,154 @@ jobs:
               private const val SR = 44100
               private val scope = CoroutineScope(Dispatchers.Default + Job())
 
+              private fun toShort(v: Double): Short {
+                  val clamped = v.coerceIn(-1.0, 1.0)
+                  return (clamped * 32000.0).toInt().coerceIn(-32768, 32767).toShort()
+              }
+
               private fun makeKick(): ShortArray {
-                  val n = (SR * 0.45f).toInt(); val buf = ShortArray(n); var phase = 0.0
+                  val n = (SR * 0.45).toInt()
+                  val buf = ShortArray(n)
+                  var phase = 0.0
                   for (i in 0 until n) {
-                      val t = i.toFloat() / SR
-                      val freq = 55f + 90f * exp(-t * 30f)
-                      phase += 2.0 * PI * freq / SR
-                      val env = exp(-t * 7f)
-                      val click = if (t < 0.004f) (1f - t / 0.004f) * 0.6f else 0f
-                      val s = (sin(phase) * env + click * (Random.nextFloat() * 2 - 1)).coerceIn(-1f, 1f)
-                      buf[i] = (s * 30000f).toInt().coerceIn(-32768, 32767).toShort()
+                      val t = i.toDouble() / SR.toDouble()
+                      val freq = 55.0 + 90.0 * exp(-t * 30.0)
+                      phase += 2.0 * PI * freq / SR.toDouble()
+                      val env = exp(-t * 7.0)
+                      val click = if (t < 0.004) (1.0 - t / 0.004) * 0.6 else 0.0
+                      val s = sin(phase) * env + click * (Random.nextDouble() * 2.0 - 1.0)
+                      buf[i] = toShort(s)
                   }
                   return buf
               }
 
               private fun makeSnare(): ShortArray {
-                  val n = (SR * 0.30f).toInt(); val buf = ShortArray(n); var phase = 0.0
+                  val n = (SR * 0.30).toInt()
+                  val buf = ShortArray(n)
+                  var phase = 0.0
                   for (i in 0 until n) {
-                      val t = i.toFloat() / SR
-                      phase += 2.0 * PI * 200f / SR
-                      val noise = (Random.nextFloat() * 2 - 1)
-                      val noiseEnv = exp(-t * 18f); val toneEnv = exp(-t * 14f)
-                      val s = (noise * noiseEnv * 0.7f + sin(phase) * toneEnv * 0.5f).coerceIn(-1f, 1f)
-                      buf[i] = (s * 28000f).toInt().coerceIn(-32768, 32767).toShort()
+                      val t = i.toDouble() / SR.toDouble()
+                      phase += 2.0 * PI * 200.0 / SR.toDouble()
+                      val noise = Random.nextDouble() * 2.0 - 1.0
+                      val noiseEnv = exp(-t * 18.0)
+                      val toneEnv = exp(-t * 14.0)
+                      val s = noise * noiseEnv * 0.7 + sin(phase) * toneEnv * 0.5
+                      buf[i] = toShort(s)
                   }
                   return buf
               }
 
               private fun makeHiHat(open: Boolean = false): ShortArray {
-                  val dur = if (open) 0.28f else 0.06f
-                  val n = (SR * dur).toInt(); val buf = ShortArray(n)
-                  var hp1 = 0f; var hp2 = 0f
+                  val dur = if (open) 0.28 else 0.06
+                  val n = (SR * dur).toInt()
+                  val buf = ShortArray(n)
+                  var hp1 = 0.0
+                  var hp2 = 0.0
+                  val decay = if (open) 12.0 else 45.0
                   for (i in 0 until n) {
-                      val t = i.toFloat() / SR
-                      val noise = (Random.nextFloat() * 2 - 1)
-                      hp1 = hp1 + 0.90f * (noise - hp1); val hp1Band = noise - hp1
-                      hp2 = hp2 + 0.90f * (hp1Band - hp2); val filtered = hp1Band - hp2
-                      val env = exp(-t * (if (open) 12f else 45f))
-                      val s = (filtered * env * 0.55f).coerceIn(-1f, 1f)
-                      buf[i] = (s * 26000f).toInt().coerceIn(-32768, 32767).toShort()
+                      val t = i.toDouble() / SR.toDouble()
+                      val noise = Random.nextDouble() * 2.0 - 1.0
+                      hp1 += 0.90 * (noise - hp1)
+                      val hp1Band = noise - hp1
+                      hp2 += 0.90 * (hp1Band - hp2)
+                      val filtered = hp1Band - hp2
+                      val env = exp(-t * decay)
+                      val s = filtered * env * 0.55
+                      buf[i] = toShort(s)
                   }
                   return buf
               }
 
               private fun makeClap(): ShortArray {
-                  val n = (SR * 0.30f).toInt(); val buf = ShortArray(n)
-                  val starts = floatArrayOf(0f, 0.010f, 0.021f, 0.032f)
+                  val n = (SR * 0.30).toInt()
+                  val buf = ShortArray(n)
+                  val starts = doubleArrayOf(0.0, 0.010, 0.021, 0.032)
                   for (i in 0 until n) {
-                      val t = i.toFloat() / SR; var s = 0f
-                      for (st in starts) if (t >= st) { val dt = t - st; s += (Random.nextFloat() * 2 - 1) * exp(-dt * 40f) }
-                      s = (s * 0.35f).coerceIn(-1f, 1f)
-                      buf[i] = (s * 27000f).toInt().coerceIn(-32768, 32767).toShort()
+                      val t = i.toDouble() / SR.toDouble()
+                      var s = 0.0
+                      for (st in starts) {
+                          if (t >= st) {
+                              val dt = t - st
+                              s += (Random.nextDouble() * 2.0 - 1.0) * exp(-dt * 40.0)
+                          }
+                      }
+                      s *= 0.35
+                      buf[i] = toShort(s)
                   }
                   return buf
               }
 
               private fun makePerc(): ShortArray {
-                  val n = (SR * 0.18f).toInt(); val buf = ShortArray(n); var phase = 0.0
+                  val n = (SR * 0.18).toInt()
+                  val buf = ShortArray(n)
+                  var phase = 0.0
                   for (i in 0 until n) {
-                      val t = i.toFloat() / SR
-                      phase += 2.0 * PI * 400f / SR
-                      val env = exp(-t * 25f)
-                      val s = (sin(phase) * env * 0.8f).coerceIn(-1f, 1f)
-                      buf[i] = (s * 26000f).toInt().coerceIn(-32768, 32767).toShort()
+                      val t = i.toDouble() / SR.toDouble()
+                      phase += 2.0 * PI * 400.0 / SR.toDouble()
+                      val env = exp(-t * 25.0)
+                      val s = sin(phase) * env * 0.8
+                      buf[i] = toShort(s)
                   }
                   return buf
               }
 
               private fun makeRiser(): ShortArray {
-                  val dur = 1.0f; val n = (SR * dur).toInt(); val buf = ShortArray(n); var phase = 0.0
+                  val dur = 1.0
+                  val n = (SR * dur).toInt()
+                  val buf = ShortArray(n)
+                  var phase = 0.0
                   for (i in 0 until n) {
-                      val t = i.toFloat() / SR
+                      val t = i.toDouble() / SR.toDouble()
                       val progress = t / dur
-                      val freq = 200f * Math.pow(10.0, progress * 1.0).toFloat()
-                      phase += 2.0 * PI * freq / SR
-                      val env = progress * 0.75f
-                      val s = (sin(phase) * env).coerceIn(-1f, 1f)
-                      buf[i] = (s * 24000f).toInt().coerceIn(-32768, 32767).toShort()
+                      val freq = 200.0 * 10.0.pow(progress * 1.0)
+                      phase += 2.0 * PI * freq / SR.toDouble()
+                      val env = progress * 0.75
+                      val s = sin(phase) * env
+                      buf[i] = toShort(s)
                   }
                   return buf
               }
 
               private fun makeLaser(): ShortArray {
-                  val dur = 0.20f; val n = (SR * dur).toInt(); val buf = ShortArray(n); var phase = 0.0
+                  val dur = 0.20
+                  val n = (SR * dur).toInt()
+                  val buf = ShortArray(n)
+                  var phase = 0.0
                   for (i in 0 until n) {
-                      val t = i.toFloat() / SR
+                      val t = i.toDouble() / SR.toDouble()
                       val progress = t / dur
-                      val freq = 2000f * Math.pow(10.0, -progress * 1.3).toFloat()
-                      phase += 2.0 * PI * freq / SR
-                      val env = exp(-t * 6f)
-                      val s = (sin(phase) * env * 0.85f).coerceIn(-1f, 1f)
-                      buf[i] = (s * 26000f).toInt().coerceIn(-32768, 32767).toShort()
+                      val freq = 2000.0 * 10.0.pow(-progress * 1.3)
+                      phase += 2.0 * PI * freq / SR.toDouble()
+                      val env = exp(-t * 6.0)
+                      val s = sin(phase) * env * 0.85
+                      buf[i] = toShort(s)
                   }
                   return buf
               }
 
               private fun makeSiren(): ShortArray {
-                  val dur = 0.9f; val n = (SR * dur).toInt(); val buf = ShortArray(n); var phase = 0.0
+                  val dur = 0.9
+                  val n = (SR * dur).toInt()
+                  val buf = ShortArray(n)
+                  var phase = 0.0
                   for (i in 0 until n) {
-                      val t = i.toFloat() / SR
+                      val t = i.toDouble() / SR.toDouble()
                       val vibrato = 1.0 + 0.20 * sin(2.0 * PI * 6.0 * t)
                       val freq = 800.0 * vibrato
-                      phase += 2.0 * PI * freq / SR
-                      val env = if (t < 0.05f) t / 0.05f else if (t > dur - 0.1f) (dur - t) / 0.1f else 1f
-                      val s = (sin(phase) * env * 0.7f).coerceIn(-1f, 1f)
-                      buf[i] = (s * 26000f).toInt().coerceIn(-32768, 32767).toShort()
+                      phase += 2.0 * PI * freq / SR.toDouble()
+                      val env = when {
+                          t < 0.05 -> t / 0.05
+                          t > dur - 0.1 -> (dur - t) / 0.1
+                          else -> 1.0
+                      }
+                      val s = sin(phase) * env * 0.7
+                      buf[i] = toShort(s)
                   }
                   return buf
               }
 
               private val cache = mutableMapOf<String, ShortArray>()
+
               private fun getSample(name: String): ShortArray = cache.getOrPut(name) {
                   when (name) {
                       "KICK" -> makeKick()
@@ -694,7 +734,7 @@ jobs:
           }
           EOF
 
-      - name: SampleStore.kt (restored)
+      - name: SampleStore.kt
         run: |
           cat > app/src/main/java/com/djpro/mixer/audio/SampleStore.kt << 'EOF'
           package com.djpro.mixer.audio
@@ -729,7 +769,7 @@ jobs:
           }
           EOF
 
-      - name: SampleFilePlayer.kt (restored)
+      - name: SampleFilePlayer.kt
         run: |
           cat > app/src/main/java/com/djpro/mixer/audio/SampleFilePlayer.kt << 'EOF'
           package com.djpro.mixer.audio
@@ -2262,7 +2302,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "v6.2 fix: restored SampleSynth/SampleStore/SampleFilePlayer (missing since v6.1)" || echo "nothing"
+          git commit -m "v6.3 fix: SampleSynth all Double math (no Float/Double mismatch)" || echo "nothing"
           git push
 
       - name: Set up JDK 17
@@ -2277,6 +2317,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: DJProMixer-v62-debug
+          name: DJProMixer-v63-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: warn
