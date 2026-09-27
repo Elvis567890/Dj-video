@@ -85,8 +85,8 @@ jobs:
                   applicationId = "com.djpro.mixer"
                   minSdk = 26
                   targetSdk = 34
-                  versionCode = 15
-                  versionName = "6.1.0"
+                  versionCode = 16
+                  versionName = "6.2.0"
               }
               buildTypes { release { isMinifyEnabled = false } }
               compileOptions {
@@ -518,6 +518,269 @@ jobs:
                   effectJob?.cancel(); loopJob?.cancel()
                   try { player.release() } catch (_: Throwable) {}
                   try { audioSink.release() } catch (_: Throwable) {}
+              }
+          }
+          EOF
+
+      - name: SampleSynth.kt (restored)
+        run: |
+          cat > app/src/main/java/com/djpro/mixer/audio/SampleSynth.kt << 'EOF'
+          package com.djpro.mixer.audio
+
+          import android.media.AudioAttributes
+          import android.media.AudioFormat
+          import android.media.AudioTrack
+          import kotlinx.coroutines.CoroutineScope
+          import kotlinx.coroutines.Dispatchers
+          import kotlinx.coroutines.Job
+          import kotlinx.coroutines.launch
+          import kotlin.math.PI
+          import kotlin.math.exp
+          import kotlin.math.sin
+          import kotlin.random.Random
+
+          object SampleSynth {
+
+              private const val SR = 44100
+              private val scope = CoroutineScope(Dispatchers.Default + Job())
+
+              private fun makeKick(): ShortArray {
+                  val n = (SR * 0.45f).toInt(); val buf = ShortArray(n); var phase = 0.0
+                  for (i in 0 until n) {
+                      val t = i.toFloat() / SR
+                      val freq = 55f + 90f * exp(-t * 30f)
+                      phase += 2.0 * PI * freq / SR
+                      val env = exp(-t * 7f)
+                      val click = if (t < 0.004f) (1f - t / 0.004f) * 0.6f else 0f
+                      val s = (sin(phase) * env + click * (Random.nextFloat() * 2 - 1)).coerceIn(-1f, 1f)
+                      buf[i] = (s * 30000f).toInt().coerceIn(-32768, 32767).toShort()
+                  }
+                  return buf
+              }
+
+              private fun makeSnare(): ShortArray {
+                  val n = (SR * 0.30f).toInt(); val buf = ShortArray(n); var phase = 0.0
+                  for (i in 0 until n) {
+                      val t = i.toFloat() / SR
+                      phase += 2.0 * PI * 200f / SR
+                      val noise = (Random.nextFloat() * 2 - 1)
+                      val noiseEnv = exp(-t * 18f); val toneEnv = exp(-t * 14f)
+                      val s = (noise * noiseEnv * 0.7f + sin(phase) * toneEnv * 0.5f).coerceIn(-1f, 1f)
+                      buf[i] = (s * 28000f).toInt().coerceIn(-32768, 32767).toShort()
+                  }
+                  return buf
+              }
+
+              private fun makeHiHat(open: Boolean = false): ShortArray {
+                  val dur = if (open) 0.28f else 0.06f
+                  val n = (SR * dur).toInt(); val buf = ShortArray(n)
+                  var hp1 = 0f; var hp2 = 0f
+                  for (i in 0 until n) {
+                      val t = i.toFloat() / SR
+                      val noise = (Random.nextFloat() * 2 - 1)
+                      hp1 = hp1 + 0.90f * (noise - hp1); val hp1Band = noise - hp1
+                      hp2 = hp2 + 0.90f * (hp1Band - hp2); val filtered = hp1Band - hp2
+                      val env = exp(-t * (if (open) 12f else 45f))
+                      val s = (filtered * env * 0.55f).coerceIn(-1f, 1f)
+                      buf[i] = (s * 26000f).toInt().coerceIn(-32768, 32767).toShort()
+                  }
+                  return buf
+              }
+
+              private fun makeClap(): ShortArray {
+                  val n = (SR * 0.30f).toInt(); val buf = ShortArray(n)
+                  val starts = floatArrayOf(0f, 0.010f, 0.021f, 0.032f)
+                  for (i in 0 until n) {
+                      val t = i.toFloat() / SR; var s = 0f
+                      for (st in starts) if (t >= st) { val dt = t - st; s += (Random.nextFloat() * 2 - 1) * exp(-dt * 40f) }
+                      s = (s * 0.35f).coerceIn(-1f, 1f)
+                      buf[i] = (s * 27000f).toInt().coerceIn(-32768, 32767).toShort()
+                  }
+                  return buf
+              }
+
+              private fun makePerc(): ShortArray {
+                  val n = (SR * 0.18f).toInt(); val buf = ShortArray(n); var phase = 0.0
+                  for (i in 0 until n) {
+                      val t = i.toFloat() / SR
+                      phase += 2.0 * PI * 400f / SR
+                      val env = exp(-t * 25f)
+                      val s = (sin(phase) * env * 0.8f).coerceIn(-1f, 1f)
+                      buf[i] = (s * 26000f).toInt().coerceIn(-32768, 32767).toShort()
+                  }
+                  return buf
+              }
+
+              private fun makeRiser(): ShortArray {
+                  val dur = 1.0f; val n = (SR * dur).toInt(); val buf = ShortArray(n); var phase = 0.0
+                  for (i in 0 until n) {
+                      val t = i.toFloat() / SR
+                      val progress = t / dur
+                      val freq = 200f * Math.pow(10.0, progress * 1.0).toFloat()
+                      phase += 2.0 * PI * freq / SR
+                      val env = progress * 0.75f
+                      val s = (sin(phase) * env).coerceIn(-1f, 1f)
+                      buf[i] = (s * 24000f).toInt().coerceIn(-32768, 32767).toShort()
+                  }
+                  return buf
+              }
+
+              private fun makeLaser(): ShortArray {
+                  val dur = 0.20f; val n = (SR * dur).toInt(); val buf = ShortArray(n); var phase = 0.0
+                  for (i in 0 until n) {
+                      val t = i.toFloat() / SR
+                      val progress = t / dur
+                      val freq = 2000f * Math.pow(10.0, -progress * 1.3).toFloat()
+                      phase += 2.0 * PI * freq / SR
+                      val env = exp(-t * 6f)
+                      val s = (sin(phase) * env * 0.85f).coerceIn(-1f, 1f)
+                      buf[i] = (s * 26000f).toInt().coerceIn(-32768, 32767).toShort()
+                  }
+                  return buf
+              }
+
+              private fun makeSiren(): ShortArray {
+                  val dur = 0.9f; val n = (SR * dur).toInt(); val buf = ShortArray(n); var phase = 0.0
+                  for (i in 0 until n) {
+                      val t = i.toFloat() / SR
+                      val vibrato = 1.0 + 0.20 * sin(2.0 * PI * 6.0 * t)
+                      val freq = 800.0 * vibrato
+                      phase += 2.0 * PI * freq / SR
+                      val env = if (t < 0.05f) t / 0.05f else if (t > dur - 0.1f) (dur - t) / 0.1f else 1f
+                      val s = (sin(phase) * env * 0.7f).coerceIn(-1f, 1f)
+                      buf[i] = (s * 26000f).toInt().coerceIn(-32768, 32767).toShort()
+                  }
+                  return buf
+              }
+
+              private val cache = mutableMapOf<String, ShortArray>()
+              private fun getSample(name: String): ShortArray = cache.getOrPut(name) {
+                  when (name) {
+                      "KICK" -> makeKick()
+                      "SNARE" -> makeSnare()
+                      "HIHAT" -> makeHiHat(false)
+                      "HATOPEN" -> makeHiHat(true)
+                      "CLAP" -> makeClap()
+                      "PERC" -> makePerc()
+                      "RISER" -> makeRiser()
+                      "LASER" -> makeLaser()
+                      "SIREN" -> makeSiren()
+                      else -> makeKick()
+                  }
+              }
+
+              fun play(name: String) {
+                  val samples = getSample(name)
+                  scope.launch {
+                      try {
+                          val track = AudioTrack.Builder()
+                              .setAudioAttributes(AudioAttributes.Builder()
+                                  .setUsage(AudioAttributes.USAGE_MEDIA)
+                                  .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build())
+                              .setAudioFormat(AudioFormat.Builder()
+                                  .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                                  .setSampleRate(SR)
+                                  .setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
+                              .setBufferSizeInBytes(samples.size * 2)
+                              .setTransferMode(AudioTrack.MODE_STATIC).build()
+                          track.write(samples, 0, samples.size)
+                          track.play()
+                          kotlinx.coroutines.delay((samples.size.toLong() * 1000L / SR) + 120)
+                          try { track.stop() } catch (_: Throwable) {}
+                          try { track.release() } catch (_: Throwable) {}
+                      } catch (_: Throwable) {}
+                  }
+              }
+          }
+          EOF
+
+      - name: SampleStore.kt (restored)
+        run: |
+          cat > app/src/main/java/com/djpro/mixer/audio/SampleStore.kt << 'EOF'
+          package com.djpro.mixer.audio
+
+          import android.content.Context
+          import android.net.Uri
+
+          object SampleStore {
+              private const val PREFS = "dj_sampler_v1"
+              private const val PAD_COUNT = 8
+              private const val KEY_PREFIX = "pad_uri_"
+
+              fun getAssignedUri(context: Context, padIndex: Int): String? {
+                  if (padIndex !in 0 until PAD_COUNT) return null
+                  val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                  return prefs.getString(KEY_PREFIX + padIndex, null)
+              }
+
+              fun assign(context: Context, padIndex: Int, uri: Uri?) {
+                  if (padIndex !in 0 until PAD_COUNT) return
+                  val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                  prefs.edit().apply {
+                      if (uri == null) remove(KEY_PREFIX + padIndex)
+                      else putString(KEY_PREFIX + padIndex, uri.toString())
+                  }.apply()
+              }
+
+              fun clearAll(context: Context) {
+                  val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                  prefs.edit().clear().apply()
+              }
+          }
+          EOF
+
+      - name: SampleFilePlayer.kt (restored)
+        run: |
+          cat > app/src/main/java/com/djpro/mixer/audio/SampleFilePlayer.kt << 'EOF'
+          package com.djpro.mixer.audio
+
+          import android.content.Context
+          import android.media.AudioAttributes
+          import android.media.MediaPlayer
+          import android.net.Uri
+
+          object SampleFilePlayer {
+
+              private val active = mutableListOf<MediaPlayer>()
+
+              fun play(context: Context, uri: Uri, onError: (() -> Unit)? = null) {
+                  try {
+                      val mp = MediaPlayer()
+                      mp.setAudioAttributes(
+                          AudioAttributes.Builder()
+                              .setUsage(AudioAttributes.USAGE_MEDIA)
+                              .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                              .build()
+                      )
+                      mp.setDataSource(context, uri)
+                      mp.setOnCompletionListener { p ->
+                          try { p.release() } catch (_: Throwable) {}
+                          active.remove(p)
+                      }
+                      mp.setOnErrorListener { p, _, _ ->
+                          try { p.release() } catch (_: Throwable) {}
+                          active.remove(p)
+                          onError?.invoke()
+                          true
+                      }
+                      mp.prepare()
+                      mp.start()
+                      active.add(mp)
+                      if (active.size > 8) {
+                          val old = active.removeAt(0)
+                          try { old.release() } catch (_: Throwable) {}
+                      }
+                  } catch (_: Throwable) {
+                      onError?.invoke()
+                  }
+              }
+
+              fun stopAll() {
+                  for (mp in active.toList()) {
+                      try { mp.stop() } catch (_: Throwable) {}
+                      try { mp.release() } catch (_: Throwable) {}
+                  }
+                  active.clear()
               }
           }
           EOF
@@ -1999,7 +2262,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "v6.1 fix: removed deprecated android.bundle.enableUncompressedNativeLibs" || echo "nothing"
+          git commit -m "v6.2 fix: restored SampleSynth/SampleStore/SampleFilePlayer (missing since v6.1)" || echo "nothing"
           git push
 
       - name: Set up JDK 17
@@ -2014,6 +2277,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: DJProMixer-v61-debug
+          name: DJProMixer-v62-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: warn
