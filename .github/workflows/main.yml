@@ -32,6 +32,7 @@ jobs:
           mkdir -p app/src/main/java/com/ultimate/dj/ui
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/drawable
+          mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/mipmap-anydpi-v26
 
       - name: Root gradle
@@ -242,6 +243,22 @@ jobs:
               <background android:drawable="@color/ultimateIconBg"/>
               <foreground android:drawable="@drawable/ic_launcher_foreground"/>
           </adaptive-icon>
+          EOF
+
+      - name: Player layout
+        run: |
+          cat > app/src/main/res/layout/player_view.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <androidx.media3.ui.PlayerView
+              xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:app="http://schemas.android.com/apk/res-auto"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              app:surface_type="texture_view"
+              app:use_controller="false"
+              app:show_buffering="never"
+              app:resize_mode="fit"
+              app:shutter_background_color="#00000000" />
           EOF
 
       - name: Palette
@@ -1630,7 +1647,6 @@ jobs:
         run: |
           cat > app/src/main/java/com/ultimate/dj/ui/VideoDeckView.kt << 'EOF'
           package com.ultimate.dj.ui
-          import android.view.ViewGroup
           import androidx.compose.animation.core.animateFloatAsState
           import androidx.compose.animation.core.tween
           import androidx.compose.foundation.layout.Box
@@ -1642,8 +1658,8 @@ jobs:
           import androidx.compose.ui.graphics.Color
           import androidx.compose.ui.graphics.graphicsLayer
           import androidx.compose.ui.viewinterop.AndroidView
-          import androidx.media3.ui.AspectRatioFrameLayout
           import androidx.media3.ui.PlayerView
+          import com.ultimate.dj.R
           import com.ultimate.dj.audio.DeckPlayer
           import kotlin.math.abs
           import kotlin.math.sin
@@ -1702,18 +1718,10 @@ jobs:
                               cameraDistance = camDist * density
                           },
                       factory = { c ->
-                          PlayerView(c).apply {
-                              layoutParams = ViewGroup.LayoutParams(
-                                  ViewGroup.LayoutParams.MATCH_PARENT,
-                                  ViewGroup.LayoutParams.MATCH_PARENT
-                              )
-                              setSurfaceType(PlayerView.SURFACE_TYPE_TEXTURE_VIEW)
-                              useController = false
-                              setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
-                              resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                              setShutterBackgroundColor(android.graphics.Color.BLACK)
-                              player = deck.player
-                          }
+                          val view = android.view.LayoutInflater.from(c)
+                              .inflate(R.layout.player_view, null) as PlayerView
+                          view.player = deck.player
+                          view
                       },
                       update = { view -> view.player = deck.player },
                       onRelease = { view -> view.player = null }
@@ -2569,8 +2577,6 @@ jobs:
           import com.ultimate.dj.ui.*
           import com.ultimate.dj.video.MixRecorder
           import kotlinx.coroutines.delay
-          private const val SAMPLE_A = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
-          private const val SAMPLE_B = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
           @Composable
           fun MainScreen(engine: AudioEngine, recorder: MixRecorder, activity: Activity) {
               val context = LocalContext.current
@@ -2640,7 +2646,6 @@ jobs:
 
               Box(modifier = Modifier.fillMaxSize().background(Neon.BG)) {
 
-                  // CLEAN RECORDING MODE — 100% video, no UI captured
                   if (theaterMode) {
                       Box(modifier = Modifier.fillMaxSize().background(Color.Black)
                           .pointerInput(Unit) {
@@ -3095,5 +3100,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git diff --cached --quiet || git commit -m "ULTIMATE v5.0.0: clean video recording + in-app library + professional UI"
+          git diff --cached --quiet || git commit -m "ULTIMATE v5.0.0: PlayerView via XML layout with texture_view surface"
           git push || echo "push failed"
