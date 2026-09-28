@@ -8,6 +8,10 @@
         "source": "com.ultimate.dj.app-main-55:/mipmap-anydpi-v26/ic_launcher.xml"
     },
     {
+        "merged": "com.ultimate.dj.app-debug-53:/layout_player_view.xml.flat",
+        "source": "com.ultimate.dj.app-main-55:/layout/player_view.xml"
+    },
+    {
         "merged": "com.ultimate.dj.app-debug-53:/drawable_ic_launcher_foreground.xml.flat",
         "source": "com.ultimate.dj.app-main-55:/drawable/ic_launcher_foreground.xml"
     }

@@ -21,7 +21,7 @@ fun MasterVu(playing: Boolean, modifier: Modifier = Modifier) {
     val infinite = rememberInfiniteTransition(label = "vu")
     val phase by infinite.animateFloat(0f, (2 * Math.PI).toFloat() * 20f,
         infiniteRepeatable(tween(2500, easing = LinearEasing), RepeatMode.Restart), label = "phase")
-    Canvas(modifier = modifier.width(18.dp).fillMaxHeight()) {
+    Canvas(modifier = modifier.width(14.dp).fillMaxHeight()) {
         val w = size.width; val h = size.height
         val segments = 20; val segH = (h - (segments - 1) * 2f) / segments
         for (i in 0 until segments) {
@@ -29,12 +29,12 @@ fun MasterVu(playing: Boolean, modifier: Modifier = Modifier) {
             val level = if (playing) (0.55f + 0.45f * sin(phase + i * 0.6f)).coerceIn(0.20f, 1f) else 0.10f
             val lit = t < level
             val color = when {
-                t > 0.90f -> Color(0xFFFF3B5C)
-                t > 0.75f -> Color(0xFFFFD54A)
-                t > 0.55f -> Color(0xFF9CFF2B)
-                else -> Color(0xFF00E5FF)
+                t > 0.90f -> Color(0xFFEF4444)
+                t > 0.75f -> Color(0xFFEAB308)
+                t > 0.55f -> Color(0xFF22C55E)
+                else -> Color(0xFF22C55E)
             }
-            drawRect(color = color.copy(alpha = if (lit) 1f else 0.10f), topLeft = Offset(0f, y), size = Size(w, segH))
+            drawRect(color = color.copy(alpha = if (lit) 0.95f else 0.08f), topLeft = Offset(0f, y), size = Size(w, segH))
         }
     }
 }

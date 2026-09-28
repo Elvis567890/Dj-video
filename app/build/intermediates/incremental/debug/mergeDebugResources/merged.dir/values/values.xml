@@ -185,10 +185,10 @@
     <color name="switch_thumb_normal_material_light">#fff1f1f1</color>
     <color name="tooltip_background_dark">#e6616161</color>
     <color name="tooltip_background_light">#e6FFFFFF</color>
-    <color name="ultimateBackground">#04040A</color>
-    <color name="ultimateCyan">#00E5FF</color>
-    <color name="ultimateIconBg">#04040A</color>
-    <color name="ultimateMagenta">#FF2BD6</color>
+    <color name="ultimateAmber">#F97316</color>
+    <color name="ultimateBackground">#0A0A0C</color>
+    <color name="ultimateBlue">#3B82F6</color>
+    <color name="ultimateIconBg">#0A0A0C</color>
     <dimen name="abc_action_bar_content_inset_material">16dp</dimen>
     <dimen name="abc_action_bar_content_inset_with_nav">72dp</dimen>
     <dimen name="abc_action_bar_default_height_material">56dp</dimen>

@@ -24,7 +24,7 @@ fun DeckStrip(
     onLoadInto: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(modifier = modifier.fillMaxWidth().height(52.dp),
+    Row(modifier = modifier.fillMaxWidth().height(40.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         decks.forEachIndexed { idx, deck ->
             val accent = Neon.DECK_COLORS[idx % Neon.DECK_COLORS.size]
@@ -32,36 +32,36 @@ fun DeckStrip(
             val loaded = deck.isLoaded
             Box(
                 modifier = Modifier.weight(1f).fillMaxHeight()
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(4.dp))
                     .background(
                         when {
-                            !loaded -> Color(0x11FFFFFF)
-                            isA -> accent.copy(alpha = 0.30f)
-                            isB -> Neon.MAGENTA.copy(alpha = 0.30f)
+                            !loaded -> Color(0x08FFFFFF)
+                            isA || isB -> accent.copy(alpha = 0.20f)
                             else -> Neon.PANEL
                         }
                     )
                     .border(
-                        width = if (loaded) 1.5.dp else 1.dp,
-                        color = if (loaded) accent.copy(alpha = 0.9f) else Color(0x33FFFFFF),
-                        shape = RoundedCornerShape(8.dp)
+                        width = if (isA || isB) 1.dp else 0.5.dp,
+                        color = when {
+                            !loaded -> Color(0x15FFFFFF)
+                            isA || isB -> accent
+                            else -> Color(0x20FFFFFF)
+                        },
+                        shape = RoundedCornerShape(4.dp)
                     )
                     .clickable { if (loaded) onSelect(idx) else onLoadInto(idx) },
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("D${idx + 1}",
-                        color = if (loaded) accent else Color(0x66FFFFFF),
-                        fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                        color = if (loaded) accent else Color(0x40FFFFFF),
+                        fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
                     if (loaded) {
-                        Text(if (deck.isPlaying) "▶" else "❚❚",
-                            color = accent, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                        if (isA || isB) {
-                            Text(if (isA) "A" else "B", color = Color.White,
-                                fontSize = 7.sp, fontWeight = FontWeight.Black)
-                        }
+                        Text(if (isA) "A" else if (isB) "B" else "•",
+                            color = if (isA || isB) Color.White else accent.copy(alpha = 0.5f),
+                            fontSize = 7.sp, fontWeight = FontWeight.Black)
                     } else {
-                        Text("+", color = Color(0x88FFFFFF), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("+", color = Color(0x33FFFFFF), fontSize = 11.sp, fontWeight = FontWeight.Light)
                     }
                 }
             }

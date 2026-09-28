@@ -1,21 +1,17 @@
 package com.ultimate.dj.ui
-import android.view.ViewGroup
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import com.ultimate.dj.R
 import com.ultimate.dj.audio.DeckPlayer
 import kotlin.math.abs
 import kotlin.math.sin
@@ -74,69 +70,13 @@ fun VideoDeckView(
                     cameraDistance = camDist * density
                 },
             factory = { c ->
-                PlayerView(c).apply {
-                    layoutParams = ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
-                    useController = false
-                    setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                    setShutterBackgroundColor(android.graphics.Color.BLACK)
-                    player = deck.player
-                }
+                val view = android.view.LayoutInflater.from(c)
+                    .inflate(R.layout.player_view, null) as PlayerView
+                view.player = deck.player
+                view
             },
             update = { view -> view.player = deck.player },
             onRelease = { view -> view.player = null }
         )
-        if (smoothT > 0.05f && alpha > 0.15f) {
-            when (transition) {
-                VideoTransition.GLITCH -> GlitchOverlay(accentColor, smoothT, progress)
-                VideoTransition.STROBE -> StrobeOverlay(accentColor, smoothT, progress)
-                VideoTransition.BURN -> BurnOverlay(accentColor, smoothT)
-                else -> {}
-            }
-        }
-        if (showScratchOverlay && deck.scratching && alpha > 0.3f) {
-            ScratchOverlay(accentColor, deck.scratchRate, deck.scratchVelocity,
-                Modifier.fillMaxSize().graphicsLayer { this.alpha = alpha.coerceIn(0f, 1f) })
-        }
-    }
-}
-@Composable
-private fun GlitchOverlay(accent: Color, intensity: Float, progress: Float) {
-    Canvas(modifier = Modifier.fillMaxSize()) {
-        val w = size.width; val h = size.height
-        val rnd = Random((progress * 10000f).toInt() * 7919)
-        val bars = (8 + intensity * 22).toInt()
-        for (i in 0 until bars) {
-            val y = rnd.nextFloat() * h
-            val barH = 1f + rnd.nextFloat() * (2f + 10f * intensity)
-            val xOff = (rnd.nextFloat() - 0.5f) * 90f * intensity
-            val a = 0.20f + 0.55f * intensity * rnd.nextFloat()
-            val col = when (rnd.nextInt(3)) {
-                0 -> accent.copy(alpha = a)
-                1 -> Color(0xFFFF0044).copy(alpha = a * 0.8f)
-                else -> Color(0xFF00FF88).copy(alpha = a * 0.6f)
-            }
-            drawRect(color = col, topLeft = Offset(xOff, y), size = Size(w, barH))
-        }
-    }
-}
-@Composable
-private fun StrobeOverlay(accent: Color, intensity: Float, progress: Float) {
-    val flash = (sin(progress * 95f) * 0.5f + 0.5f).coerceIn(0f, 1f)
-    Canvas(modifier = Modifier.fillMaxSize()) {
-        val a = flash * intensity * 0.55f
-        drawRect(color = Color.White.copy(alpha = a))
-        drawRect(color = accent.copy(alpha = a * 0.35f))
-    }
-}
-@Composable
-private fun BurnOverlay(accent: Color, intensity: Float) {
-    Canvas(modifier = Modifier.fillMaxSize()) {
-        val w = size.width; val h = size.height
-        drawRect(color = Color(0xFFFF6A00).copy(alpha = 0.18f * intensity))
-        drawRect(color = Color.White.copy(alpha = 0.35f * intensity), topLeft = Offset(0f, h * 0.45f), size = Size(w, h * 0.1f))
     }
 }

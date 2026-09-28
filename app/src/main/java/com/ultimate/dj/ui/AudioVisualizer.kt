@@ -9,23 +9,13 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.ultimate.dj.Neon
 import kotlin.math.abs
 import kotlin.math.sin
 @Composable
@@ -40,38 +30,19 @@ fun AudioVisualizer(accent: Color, isPlaying: Boolean, trackName: String, wavefo
             val c = Offset(size.width / 2f, size.height / 2f)
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(accent.copy(alpha = if (isPlaying) 0.25f * pulse else 0.08f), Color.Transparent),
+                    colors = listOf(accent.copy(alpha = if (isPlaying) 0.20f * pulse else 0.06f), Color.Transparent),
                     center = c, radius = size.minDimension * 0.7f),
                 radius = size.minDimension * 0.7f, center = c)
         }
         Canvas(modifier = Modifier.fillMaxSize()) {
             val w = size.width; val h = size.height; val mid = h / 2f
-            val bars = if (waveform.isNotEmpty()) waveform else FloatArray(48) { 0.3f }
-            val n = bars.size; val step = w / n; val barW = (step * 0.7f).coerceAtLeast(1.5f)
+            val bars = if (waveform.isNotEmpty()) waveform else FloatArray(64) { 0.3f }
+            val n = bars.size; val step = w / n; val barW = (step * 0.65f).coerceAtLeast(1.2f)
             for (i in 0 until n) {
                 val base = bars[i].coerceIn(0.02f, 1f)
-                val anim = if (isPlaying) (0.4f + 0.6f * abs(sin(phase * 0.06f + i * 0.35f))) else 0.15f
-                val amp = base * anim * (h * 0.42f); val x = i * step + step / 2f
-                drawLine(accent.copy(alpha = 0.95f), Offset(x, mid - amp), Offset(x, mid + amp), barW, StrokeCap.Round)
-            }
-            drawLine(accent.copy(alpha = 0.5f), Offset(0f, mid), Offset(w, mid), 1.5f)
-        }
-        Box(modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
-            .clip(RoundedCornerShape(50)).background(accent.copy(alpha = 0.15f))
-            .padding(horizontal = 12.dp, vertical = 4.dp)) {
-            Text("AUDIO", color = accent, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
-        }
-        if (trackName.isNotEmpty()) {
-            Box(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp)
-                .clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.6f))
-                .padding(horizontal = 14.dp, vertical = 5.dp)) {
-                Text(trackName.uppercase().take(40), color = Color.White.copy(alpha = 0.85f),
-                    fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-            }
-        }
-        if (isPlaying) {
-            Canvas(modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).size(10.dp)) {
-                drawCircle(color = Neon.LIVE)
+                val anim = if (isPlaying) (0.5f + 0.5f * abs(sin(phase * 0.06f + i * 0.35f))) else 0.2f
+                val amp = base * anim * (h * 0.40f); val x = i * step + step / 2f
+                drawLine(accent.copy(alpha = 0.85f), Offset(x, mid - amp), Offset(x, mid + amp), barW, StrokeCap.Round)
             }
         }
     }

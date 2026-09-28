@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ultimateBackground">#04040A</color>
-    <color name="ultimateCyan">#00E5FF</color>
-    <color name="ultimateIconBg">#04040A</color>
-    <color name="ultimateMagenta">#FF2BD6</color>
+    <color name="ultimateAmber">#F97316</color>
+    <color name="ultimateBackground">#0A0A0C</color>
+    <color name="ultimateBlue">#3B82F6</color>
+    <color name="ultimateIconBg">#0A0A0C</color>
     <string name="app_name">ULTIMATE</string>
     <style name="Theme.Ultimate" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/ultimateBackground</item>

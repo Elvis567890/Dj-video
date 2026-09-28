@@ -1,10 +1,11 @@
 R_DEF: Internal format may change without notice
 local
+color ultimateAmber
 color ultimateBackground
-color ultimateCyan
+color ultimateBlue
 color ultimateIconBg
-color ultimateMagenta
 drawable ic_launcher_foreground
+layout player_view
 mipmap ic_launcher
 mipmap ic_launcher_round
 string app_name

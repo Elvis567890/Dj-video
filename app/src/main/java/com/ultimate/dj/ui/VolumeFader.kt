@@ -15,27 +15,26 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 @Composable
 fun VolumeFader(accent: Color, initialValue: Float = 0.75f, onValueChange: (Float) -> Unit = {}, modifier: Modifier = Modifier) {
     var value by remember { mutableFloatStateOf(initialValue) }
-    Box(modifier = modifier.width(28.dp).fillMaxHeight().pointerInput(Unit) {
+    Box(modifier = modifier.width(26.dp).fillMaxHeight().pointerInput(Unit) {
         detectDragGestures { change: PointerInputChange, drag: Offset ->
             change.consume()
             value = (value + (-drag.y / size.height)).coerceIn(0f, 1f)
             onValueChange(value)
         }
     }) {
-        Canvas(modifier = Modifier.fillMaxHeight().width(28.dp)) {
+        Canvas(modifier = Modifier.fillMaxHeight().width(26.dp)) {
             val cx = size.width / 2f; val h = size.height
-            drawLine(Color(0xFF1E1E28), Offset(cx, 10f), Offset(cx, h - 10f), 3f, StrokeCap.Round)
-            val y = h - value * (h - 20f) - 10f
-            drawLine(accent.copy(alpha = 0.65f), Offset(cx, h - 10f), Offset(cx, y), 3f, StrokeCap.Round)
-            drawRoundRect(accent, Offset(cx - 12f, y - 6f), Size(24f, 12f), CornerRadius(3f))
-            drawRoundRect(Color(0x60000000), Offset(cx - 12f, y - 6f), Size(24f, 12f), CornerRadius(3f), style = Stroke(width = 1f))
+            drawLine(Color(0xFF25252E), Offset(cx, 8f), Offset(cx, h - 8f), 2f, StrokeCap.Round)
+            val y = h - value * (h - 16f) - 8f
+            drawLine(accent.copy(alpha = 0.55f), Offset(cx, h - 8f), Offset(cx, y), 2f, StrokeCap.Round)
+            drawRoundRect(accent.copy(alpha = 0.95f), Offset(cx - 11f, y - 5f), Size(22f, 10f), CornerRadius(2f))
+            drawRoundRect(Color(0x50000000), Offset(cx - 11f, y - 5f), Size(22f, 10f), CornerRadius(2f))
         }
     }
 }
