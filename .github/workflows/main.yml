@@ -88,8 +88,8 @@ jobs:
                   applicationId = "com.ultimate.dj"
                   minSdk = 24
                   targetSdk = 34
-                  versionCode = 34
-                  versionName = "3.4.0"
+                  versionCode = 35
+                  versionName = "3.5.0"
               }
               buildTypes { release { isMinifyEnabled = false } }
               compileOptions {
@@ -1246,9 +1246,14 @@ jobs:
               var masterVolume: Float = 1.0f; private set
               var activeDeckA: Int = 0; private set
               var activeDeckB: Int = 1; private set
-              var echoEnabled = false; var filterEnabled = false; var filterHighPass = false; var vocalRemovalEnabled = false
+              var echoEnabled = false
+              var filterEnabled = false
+              var highPassEnabled = false
+              var vocalRemovalEnabled = false
               var bassRemoveEnabled = false
-              var stemDrumsMuted = false; var stemBassMuted = false; var stemOtherMuted = false
+              var stemDrumsMuted = false
+              var stemBassMuted = false
+              var stemOtherMuted = false
               val history = mutableListOf<String>()
               init { setCrossfader(0.5f); setMasterVolume(1.0f) }
               fun swapToA(deckId: Int) { if (deckId in decks.indices && deckId != activeDeckB) { activeDeckA = deckId; applyCrossfader() } }
@@ -1258,25 +1263,28 @@ jobs:
               fun setCrossfader(v: Float) { crossfader = v.coerceIn(0f, 1f); applyCrossfader() }
               fun setCrossfaderMode(m: CrossfaderMode) { crossfaderMode = m; applyCrossfader() }
               private fun applyCrossfader() {
-                  val pair = if (crossfaderMode == CrossfaderMode.FADE) {
-                      Pair(cos(crossfader * Math.PI.toFloat() / 2f), sin(crossfader * Math.PI.toFloat() / 2f))
+                  val left: Float
+                  val right: Float
+                  if (crossfaderMode == CrossfaderMode.FADE) {
+                      left = cos(crossfader * Math.PI.toFloat() / 2f)
+                      right = sin(crossfader * Math.PI.toFloat() / 2f)
                   } else {
                       val zone = 0.05f
-                      if (crossfader < 0.5f - zone) Pair(1f, 0f)
-                      else if (crossfader > 0.5f + zone) Pair(0f, 1f)
+                      if (crossfader < 0.5f - zone) { left = 1f; right = 0f }
+                      else if (crossfader > 0.5f + zone) { left = 0f; right = 1f }
                       else {
                           val t = (crossfader - (0.5f - zone)) / (2 * zone)
-                          Pair(1f - t, t)
+                          left = 1f - t; right = t
                       }
                   }
-                  decks[activeDeckA].setVolume(pair.first * masterVolume)
-                  decks[activeDeckB].setVolume(pair.second * masterVolume)
+                  decks[activeDeckA].setVolume(left * masterVolume)
+                  decks[activeDeckB].setVolume(right * masterVolume)
               }
               fun setMasterVolume(v: Float) { masterVolume = v.coerceIn(0f, 1f); applyCrossfader() }
               fun setEcho(on: Boolean) { echoEnabled = on; decks.forEach { it.echo.enabled = on } }
               fun setEchoWetOnly(wet: Boolean) { decks.forEach { it.echo.wetOnly = wet } }
               fun setFilter(on: Boolean) { filterEnabled = on; decks.forEach { it.filter.enabled = on } }
-              fun setFilterHighPass(hp: Boolean) { filterHighPass = hp; decks.forEach { it.filter.highPass = hp } }
+              fun setFilterHighPass(hp: Boolean) { highPassEnabled = hp; decks.forEach { it.filter.highPass = hp } }
               fun setVocalRemoval(on: Boolean) { vocalRemovalEnabled = on; decks.forEach { it.vocal.enabled = on } }
               fun setBassRemove(on: Boolean) { bassRemoveEnabled = on; decks.forEach { it.vocal.bassRemoveEnabled = on } }
               fun setKeyLock(on: Boolean) { decks.forEach { it.setKeyLock(on) } }
@@ -3110,5 +3118,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git diff --cached --quiet || git commit -m "ULTIMATE v3.4.0: typed lambdas + Pair-based crossfader, all features"
+          git diff --cached --quiet || git commit -m "ULTIMATE v3.5.0: fixed JVM signature clash (filterHighPass -> highPassEnabled)"
           git push || echo "push failed"
