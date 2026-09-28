@@ -88,8 +88,8 @@ jobs:
                   applicationId = "com.ultimate.dj"
                   minSdk = 24
                   targetSdk = 34
-                  versionCode = 32
-                  versionName = "3.2.0"
+                  versionCode = 33
+                  versionName = "3.3.0"
               }
               buildTypes { release { isMinifyEnabled = false } }
               compileOptions {
@@ -98,7 +98,7 @@ jobs:
               }
               kotlinOptions {
                   jvmTarget = "17"
-                  freeCompilerArgs += listOf("-Xjvm-default=all", "-opt-in=kotlin.RequiresOptIn")
+                  freeCompilerArgs += listOf("-Xjvm-default=all")
               }
               buildFeatures { compose = true }
               composeOptions { kotlinCompilerExtensionVersion = "1.5.14" }
@@ -408,9 +408,6 @@ jobs:
                               hpPrevIn[c] = sample
                               sample = hpPrevOut[c]
                           }
-                          if (enabled && channels >= 2) {
-                              // handled below in pairs
-                          }
                           out.putShort((sample * 32767f).coerceIn(-32768f, 32767f).toInt().toShort())
                           i++
                       }
@@ -639,7 +636,7 @@ jobs:
           import java.nio.ByteBuffer
           import java.nio.ByteOrder
           import kotlin.math.cos
-          import kotlin.math.log
+          import kotlin.math.ln
           import kotlin.math.roundToInt
           import kotlin.math.sin
           object KeyDetector {
@@ -698,7 +695,7 @@ jobs:
                           j += step
                       }
                       val mag = re * re + im * im
-                      val midi = 69.0 + 12.0 * log(freq / 440.0) / log(2.0)
+                      val midi = 69.0 + 12.0 * ln(freq / 440.0) / ln(2.0)
                       val pc = ((midi.roundToInt() % 12) + 12) % 12
                       chroma[pc] += mag
                   }
@@ -3101,5 +3098,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git diff --cached --quiet || git commit -m "ULTIMATE v3.2.0: package-consistent imports, vocal + bass remover, all features"
+          git diff --cached --quiet || git commit -m "ULTIMATE v3.3.0: fixed KeyDetector ln() call"
           git push || echo "push failed"
