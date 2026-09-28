@@ -26,10 +26,10 @@ jobs:
       - name: Create directories
         run: |
           mkdir -p gradle/wrapper
-          mkdir -p app/src/main/java/com/djpro/mixer/audio
-          mkdir -p app/src/main/java/com/djpro/mixer/dsp
-          mkdir -p app/src/main/java/com/djpro/mixer/video
-          mkdir -p app/src/main/java/com/djpro/mixer/ui
+          mkdir -p app/src/main/java/com/ultimate/dj/audio
+          mkdir -p app/src/main/java/com/ultimate/dj/dsp
+          mkdir -p app/src/main/java/com/ultimate/dj/video
+          mkdir -p app/src/main/java/com/ultimate/dj/ui
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/drawable
           mkdir -p app/src/main/res/xml
@@ -2390,7 +2390,9 @@ jobs:
           import androidx.compose.foundation.background
           import androidx.compose.foundation.border
           import androidx.compose.foundation.clickable
+          import androidx.compose.foundation.horizontalScroll
           import androidx.compose.foundation.layout.*
+          import androidx.compose.foundation.rememberScrollState
           import androidx.compose.foundation.shape.CircleShape
           import androidx.compose.foundation.shape.RoundedCornerShape
           import androidx.compose.material3.Slider
@@ -2703,7 +2705,7 @@ jobs:
                       .clickable { onFxEcho(!fxEcho) }.padding(horizontal = 8.dp, vertical = 3.dp)) {
                       Text("ECHO", color = Neon.CYAN, fontSize = 7.sp, fontWeight = FontWeight.Bold)
                   }
-                  androidx.compose.foundation.layout.Row(modifier = Modifier.weight(1f).androidx.compose.foundation.horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+                  Row(modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
                       horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                       for (t in VideoTransition.entries) {
                           val sel = t == transition
@@ -3073,5 +3075,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git diff --cached --quiet || git commit -m "ULTIMATE v3.1.0: renamed app, fixed MixRecorder URI bug, all features"
+          git diff --cached --quiet || git commit -m "ULTIMATE v3.1.0: fixed directory paths for com.ultimate.dj"
           git push || echo "push failed"
