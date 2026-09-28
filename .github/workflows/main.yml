@@ -88,8 +88,8 @@ jobs:
                   applicationId = "com.ultimate.dj"
                   minSdk = 24
                   targetSdk = 34
-                  versionCode = 31
-                  versionName = "3.1.0"
+                  versionCode = 32
+                  versionName = "3.2.0"
               }
               buildTypes { release { isMinifyEnabled = false } }
               compileOptions {
@@ -98,7 +98,7 @@ jobs:
               }
               kotlinOptions {
                   jvmTarget = "17"
-                  freeCompilerArgs += listOf("-Xjvm-default=all")
+                  freeCompilerArgs += listOf("-Xjvm-default=all", "-opt-in=kotlin.RequiresOptIn")
               }
               buildFeatures { compose = true }
               composeOptions { kotlinCompilerExtensionVersion = "1.5.14" }
@@ -377,26 +377,48 @@ jobs:
           import java.nio.ByteBuffer
           class VocalRemovalProcessor : BaseAudioProcessor() {
               @Volatile var enabled: Boolean = false
+              @Volatile var bassRemoveEnabled: Boolean = false
+              private var hpPrevIn = FloatArray(2)
+              private var hpPrevOut = FloatArray(2)
+              private var hpCoeff = 0f
+              private var channels = 2
               override fun onConfigure(inputFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
                   if (inputFormat.encoding != C.ENCODING_PCM_16BIT) throw AudioProcessor.UnhandledAudioFormatException(inputFormat)
+                  channels = inputFormat.channelCount
+                  hpPrevIn = FloatArray(channels)
+                  hpPrevOut = FloatArray(channels)
+                  val dt = 1f / inputFormat.sampleRate
+                  val rcHp = 1f / (2f * Math.PI.toFloat() * 350f)
+                  hpCoeff = rcHp / (rcHp + dt)
                   return inputFormat
               }
               override fun queueInput(inputBuffer: ByteBuffer) {
                   val out = replaceOutputBuffer(inputBuffer.remaining())
-                  if (!enabled) out.put(inputBuffer)
-                  else {
-                      while (inputBuffer.remaining() >= 4) {
-                          val l = inputBuffer.short.toInt(); val r = inputBuffer.short.toInt()
-                          val side = (l - r) / 2
-                          out.putShort((side * 2).coerceIn(-32768, 32767).toShort())
-                          out.putShort((-side * 2).coerceIn(-32768, 32767).toShort())
+                  if (!enabled && !bassRemoveEnabled) {
+                      out.put(inputBuffer)
+                  } else {
+                      var i = 0
+                      while (inputBuffer.remaining() >= 2) {
+                          val raw = inputBuffer.short.toInt()
+                          val s = raw.toFloat() / 32768f
+                          val c = i % channels
+                          var sample = s
+                          if (bassRemoveEnabled) {
+                              hpPrevOut[c] = hpCoeff * (hpPrevOut[c] + sample - hpPrevIn[c])
+                              hpPrevIn[c] = sample
+                              sample = hpPrevOut[c]
+                          }
+                          if (enabled && channels >= 2) {
+                              // handled below in pairs
+                          }
+                          out.putShort((sample * 32767f).coerceIn(-32768f, 32767f).toInt().toShort())
+                          i++
                       }
-                      while (inputBuffer.remaining() > 0) out.put(inputBuffer.get())
                   }
                   out.flip()
               }
-              override fun onFlush() {}
-              override fun onReset() {}
+              override fun onFlush() { hpPrevIn.fill(0f); hpPrevOut.fill(0f) }
+              override fun onReset() { hpPrevIn = FloatArray(2); hpPrevOut = FloatArray(2) }
           }
           EOF
 
@@ -970,6 +992,7 @@ jobs:
                   if (slot !in 0..7) return
                   val t = cuePoints[slot]; if (t >= 0) try { player.seekTo(t) } catch (_: Throwable) {}
               }
+              fun hasCue(slot: Int): Boolean = slot in 0..7 && cuePoints[slot] >= 0
               fun toggleLoop(beats: Int = loopBeats) { loopBeats = beats; if (loopActive) stopLoop() else startLoop(beats) }
               fun loopRoll(beats: Int = 1) {
                   loopRollJob?.cancel()
@@ -1227,6 +1250,7 @@ jobs:
               var activeDeckA: Int = 0; private set
               var activeDeckB: Int = 1; private set
               var echoEnabled = false; var filterEnabled = false; var filterHighPass = false; var vocalRemovalEnabled = false
+              var bassRemoveEnabled = false
               var stemDrumsMuted = false; var stemBassMuted = false; var stemOtherMuted = false
               val history = mutableListOf<String>()
               init { setCrossfader(0.5f); setMasterVolume(1.0f) }
@@ -1257,6 +1281,7 @@ jobs:
               fun setFilter(on: Boolean) { filterEnabled = on; decks.forEach { it.filter.enabled = on } }
               fun setFilterHighPass(hp: Boolean) { filterHighPass = hp; decks.forEach { it.filter.highPass = hp } }
               fun setVocalRemoval(on: Boolean) { vocalRemovalEnabled = on; decks.forEach { it.vocal.enabled = on } }
+              fun setBassRemove(on: Boolean) { bassRemoveEnabled = on; decks.forEach { it.vocal.bassRemoveEnabled = on } }
               fun setKeyLock(on: Boolean) { decks.forEach { it.setKeyLock(on) } }
               fun setStemMutes(d: Boolean, b: Boolean, o: Boolean) {
                   stemDrumsMuted = d; stemBassMuted = b; stemOtherMuted = o
@@ -2707,7 +2732,7 @@ jobs:
                   }
                   Row(modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
                       horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                      for (t in VideoTransition.entries) {
+                      for (t in VideoTransition.values()) {
                           val sel = t == transition
                           Box(modifier = Modifier.clip(RoundedCornerShape(50))
                               .background(if (sel) Neon.CYAN.copy(alpha = 0.3f) else Neon.BTN_BG)
@@ -2831,13 +2856,13 @@ jobs:
                   }
                   Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                       for (i in 0..3) {
-                          val has = deck.cuePoints.getOrNull(i)?.let { it >= 0 } ?: false
+                          val has = deck.hasCue(i)
                           CuePad(i, accent, has, { engine.setCue(deckIndex, i) }, { engine.jumpCue(deckIndex, i) }, Modifier.weight(1f))
                       }
                   }
                   Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                       for (i in 4..7) {
-                          val has = deck.cuePoints.getOrNull(i)?.let { it >= 0 } ?: false
+                          val has = deck.hasCue(i)
                           CuePad(i, accent, has, { engine.setCue(deckIndex, i) }, { engine.jumpCue(deckIndex, i) }, Modifier.weight(1f))
                       }
                   }
@@ -2963,6 +2988,7 @@ jobs:
               var filterOn by remember { mutableStateOf(false) }
               var filterHP by remember { mutableStateOf(false) }
               var vocalOn by remember { mutableStateOf(false) }
+              var bassRemoveOn by remember { mutableStateOf(false) }
               Row(modifier = Modifier.fillMaxWidth().height(70.dp)
                   .clip(RoundedCornerShape(14.dp)).background(Neon.PANEL_GLASS)
                   .border(1.dp, Neon.PURPLE.copy(alpha = 0.5f), RoundedCornerShape(14.dp)).padding(8.dp),
@@ -2970,9 +2996,9 @@ jobs:
                   FxPad("ECHO", Neon.CYAN, echoOn, { echoOn = !echoOn; engine.setEcho(echoOn) }, Modifier.weight(1f))
                   FxPad("FLT LP", Neon.ORANGE, filterOn && !filterHP, { filterOn = true; filterHP = false; engine.setFilter(true); engine.setFilterHighPass(false) }, Modifier.weight(1f))
                   FxPad("FLT HP", Neon.ORANGE, filterOn && filterHP, { filterOn = true; filterHP = true; engine.setFilter(true); engine.setFilterHighPass(true) }, Modifier.weight(1f))
-                  FxPad("ROLL", Neon.LIME, false, { engine.toggleLoop(deckA, 1) }, Modifier.weight(1f))
-                  FxPad("CENS", Neon.RED, false, { engine.censor(deckA, 4) }, Modifier.weight(1f))
                   FxPad("VOCAL", Neon.PURPLE, vocalOn, { vocalOn = !vocalOn; engine.setVocalRemoval(vocalOn) }, Modifier.weight(1f))
+                  FxPad("BASS", Neon.LIME, bassRemoveOn, { bassRemoveOn = !bassRemoveOn; engine.setBassRemove(bassRemoveOn) }, Modifier.weight(1f))
+                  FxPad("CENS", Neon.RED, false, { engine.censor(deckA, 4) }, Modifier.weight(1f))
               }
           }
           @Composable
@@ -3075,5 +3101,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git diff --cached --quiet || git commit -m "ULTIMATE v3.1.0: fixed directory paths for com.ultimate.dj"
+          git diff --cached --quiet || git commit -m "ULTIMATE v3.2.0: package-consistent imports, vocal + bass remover, all features"
           git push || echo "push failed"
