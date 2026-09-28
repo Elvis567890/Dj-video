@@ -88,8 +88,8 @@ jobs:
                   applicationId = "com.ultimate.dj"
                   minSdk = 24
                   targetSdk = 34
-                  versionCode = 33
-                  versionName = "3.3.0"
+                  versionCode = 34
+                  versionName = "3.4.0"
               }
               buildTypes { release { isMinifyEnabled = false } }
               compileOptions {
@@ -1258,19 +1258,19 @@ jobs:
               fun setCrossfader(v: Float) { crossfader = v.coerceIn(0f, 1f); applyCrossfader() }
               fun setCrossfaderMode(m: CrossfaderMode) { crossfaderMode = m; applyCrossfader() }
               private fun applyCrossfader() {
-                  val (a, b) = when (crossfaderMode) {
-                      CrossfaderMode.FADE -> cos(crossfader * Math.PI.toFloat() / 2f) to sin(crossfader * Math.PI.toFloat() / 2f)
-                      CrossfaderMode.CUT -> {
-                          val zone = 0.05f
-                          when {
-                              crossfader < 0.5f - zone -> 1f to 0f
-                              crossfader > 0.5f + zone -> 0f to 1f
-                              else -> { val t = (crossfader - (0.5f - zone)) / (2 * zone); (1f - t) to t }
-                          }
+                  val pair = if (crossfaderMode == CrossfaderMode.FADE) {
+                      Pair(cos(crossfader * Math.PI.toFloat() / 2f), sin(crossfader * Math.PI.toFloat() / 2f))
+                  } else {
+                      val zone = 0.05f
+                      if (crossfader < 0.5f - zone) Pair(1f, 0f)
+                      else if (crossfader > 0.5f + zone) Pair(0f, 1f)
+                      else {
+                          val t = (crossfader - (0.5f - zone)) / (2 * zone)
+                          Pair(1f - t, t)
                       }
                   }
-                  decks[activeDeckA].setVolume(a * masterVolume)
-                  decks[activeDeckB].setVolume(b * masterVolume)
+                  decks[activeDeckA].setVolume(pair.first * masterVolume)
+                  decks[activeDeckB].setVolume(pair.second * masterVolume)
               }
               fun setMasterVolume(v: Float) { masterVolume = v.coerceIn(0f, 1f); applyCrossfader() }
               fun setEcho(on: Boolean) { echoEnabled = on; decks.forEach { it.echo.enabled = on } }
@@ -2539,10 +2539,20 @@ jobs:
                   Spacer(Modifier.height(6.dp))
                   VideoStrip(deckA, deckB, videoCrossfader, videoTransition)
                   Spacer(Modifier.height(4.dp))
-                  VideoControlsRow(videoCrossfader, { videoCrossfader = it }, accentA, accentB, videoTransition, { videoTransition = it },
-                      keyLockOn, { keyLockOn = it; engine.setKeyLock(it) },
-                      fxChainFilter, { fxChainFilter = it; engine.setFilter(it) },
-                      fxChainEcho, { fxChainEcho = it; engine.setEcho(it) })
+                  VideoControlsRow(
+                      vcf = videoCrossfader,
+                      onChange = { v: Float -> videoCrossfader = v },
+                      a = accentA,
+                      b = accentB,
+                      transition = videoTransition,
+                      onTransition = { t: VideoTransition -> videoTransition = t },
+                      keyLock = keyLockOn,
+                      onKeyLock = { v: Boolean -> keyLockOn = v; engine.setKeyLock(v) },
+                      fxFilter = fxChainFilter,
+                      onFxFilter = { v: Boolean -> fxChainFilter = v; engine.setFilter(v) },
+                      fxEcho = fxChainEcho,
+                      onFxEcho = { v: Boolean -> fxChainEcho = v; engine.setEcho(v) }
+                  )
                   Spacer(Modifier.height(8.dp))
                   Row(modifier = Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                       DeckPanel(deck = deckA, accent = accentA, label = "DECK A", engine = engine, deckIndex = activeDeckA,
@@ -2694,12 +2704,14 @@ jobs:
               }
           }
           @Composable
-          private fun VideoControlsRow(vcf: Float, onChange: (Float) -> Unit,
-                                       a: Color, b: Color,
-                                       transition: VideoTransition, onTransition: (VideoTransition) -> Unit,
-                                       keyLock: Boolean, onKeyLock: (Boolean) -> Unit,
-                                       fxFilter: Boolean, onFxFilter: (Boolean) -> Unit,
-                                       fxEcho: Boolean, onFxEcho: (Boolean) -> Unit) {
+          private fun VideoControlsRow(
+              vcf: Float, onChange: (Float) -> Unit,
+              a: Color, b: Color,
+              transition: VideoTransition, onTransition: (VideoTransition) -> Unit,
+              keyLock: Boolean, onKeyLock: (Boolean) -> Unit,
+              fxFilter: Boolean, onFxFilter: (Boolean) -> Unit,
+              fxEcho: Boolean, onFxEcho: (Boolean) -> Unit
+          ) {
               Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
                   verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                   Text("◀", color = a, fontSize = 11.sp, fontWeight = FontWeight.Bold)
@@ -3098,5 +3110,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git diff --cached --quiet || git commit -m "ULTIMATE v3.3.0: fixed KeyDetector ln() call"
+          git diff --cached --quiet || git commit -m "ULTIMATE v3.4.0: typed lambdas + Pair-based crossfader, all features"
           git push || echo "push failed"
