@@ -3,14 +3,14 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 android {
-    namespace = "com.djpro.mixer"
+    namespace = "com.ultimate.dj"
     compileSdk = 34
     defaultConfig {
         applicationId = "com.ultimate.dj"
         minSdk = 24
         targetSdk = 34
-        versionCode = 30
-        versionName = "2.0.0"
+        versionCode = 35
+        versionName = "3.5.0"
     }
     buildTypes { release { isMinifyEnabled = false } }
     compileOptions {

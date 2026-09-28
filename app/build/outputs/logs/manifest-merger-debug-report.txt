@@ -1,9 +1,9 @@
 -- Merging decision tree log ---
 manifest
-ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:2:1-40:12
-INJECTED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:2:1-40:12
-INJECTED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:2:1-40:12
-INJECTED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:2:1-40:12
+ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:2:1-41:12
+INJECTED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:2:1-41:12
+INJECTED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:2:1-41:12
+INJECTED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:2:1-41:12
 MERGED from [androidx.appcompat:appcompat-resources:1.7.0] /home/runner/.gradle/caches/transforms-4/e97b8fec522e0237fe171c43b96f412b/transformed/appcompat-resources-1.7.0/AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.appcompat:appcompat:1.7.0] /home/runner/.gradle/caches/transforms-4/36b3856ba9c7cbbdc36c1fd5fe2a4d44/transformed/appcompat-1.7.0/AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.media3:media3-ui:1.4.1] /home/runner/.gradle/caches/transforms-4/663fe680b59799d4cb88142368e025f9/transformed/media3-ui-1.4.1/AndroidManifest.xml:17:1-22:12
@@ -96,29 +96,35 @@ ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:
 		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:6:78-104
 	android:name
 		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:6:22-77
+uses-permission#android.permission.WRITE_EXTERNAL_STORAGE
+ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:7:5-108
+	android:maxSdkVersion
+		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:7:79-105
+	android:name
+		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:7:22-78
 uses-permission#android.permission.INTERNET
-ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:7:5-67
+ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:8:5-67
 	android:name
-		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:7:22-64
+		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:8:22-64
 uses-permission#android.permission.RECORD_AUDIO
-ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:8:5-71
+ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:9:5-71
 	android:name
-		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:8:22-68
+		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:9:22-68
 uses-permission#android.permission.FOREGROUND_SERVICE
-ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:9:5-77
+ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:10:5-77
 	android:name
-		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:9:22-74
+		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:10:22-74
 uses-permission#android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION
-ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:10:5-94
+ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:11:5-94
 	android:name
-		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:10:22-91
+		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:11:22-91
 uses-permission#android.permission.POST_NOTIFICATIONS
-ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:11:5-77
+ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:12:5-77
 	android:name
-		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:11:22-74
+		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:12:22-74
 application
-ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:12:5-39:19
-INJECTED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:12:5-39:19
+ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:13:5-40:19
+INJECTED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:13:5-40:19
 MERGED from [androidx.emoji2:emoji2:1.3.0] /home/runner/.gradle/caches/transforms-4/192474c036ec43764acdf6f3e34ae042/transformed/emoji2-1.3.0/AndroidManifest.xml:23:5-33:19
 MERGED from [androidx.emoji2:emoji2:1.3.0] /home/runner/.gradle/caches/transforms-4/192474c036ec43764acdf6f3e34ae042/transformed/emoji2-1.3.0/AndroidManifest.xml:23:5-33:19
 MERGED from [androidx.core:core:1.13.1] /home/runner/.gradle/caches/transforms-4/8e0a0bff2d388b6446750efdf4a5758f/transformed/core-1.13.1/AndroidManifest.xml:28:5-89
@@ -136,57 +142,57 @@ MERGED from [androidx.startup:startup-runtime:1.1.1] /home/runner/.gradle/caches
 	android:appComponentFactory
 		ADDED from [androidx.core:core:1.13.1] /home/runner/.gradle/caches/transforms-4/8e0a0bff2d388b6446750efdf4a5758f/transformed/core-1.13.1/AndroidManifest.xml:28:18-86
 	android:label
-		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:14:9-41
+		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:15:9-41
 	android:hardwareAccelerated
-		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:19:9-43
+		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:20:9-43
 	tools:ignore
-		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:21:9-64
+		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:22:9-64
 	android:roundIcon
-		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:16:9-54
+		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:17:9-54
 	android:largeHeap
-		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:17:9-33
+		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:18:9-33
 	android:icon
-		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:15:9-43
+		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:16:9-43
 	android:allowBackup
-		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:13:9-35
+		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:14:9-35
 	android:theme
-		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:20:9-46
+		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:21:9-46
 	android:usesCleartextTraffic
-		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:18:9-44
-activity#com.djpro.mixer.MainActivity
-ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:22:9-33:20
+		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:19:9-44
+activity#com.ultimate.dj.MainActivity
+ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:23:9-34:20
 	android:screenOrientation
-		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:25:13-50
+		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:26:13-50
 	android:exported
-		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:24:13-36
+		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:25:13-36
 	tools:ignore
-		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:28:13-53
+		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:29:13-53
 	android:configChanges
-		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:27:13-81
+		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:28:13-81
 	android:theme
-		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:26:13-57
+		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:27:13-57
 	android:name
-		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:23:13-41
+		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:24:13-41
 intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
-ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:29:13-32:29
+ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:30:13-33:29
 action#android.intent.action.MAIN
-ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:30:17-69
+ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:31:17-69
 	android:name
-		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:30:25-66
+		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:31:25-66
 category#android.intent.category.LAUNCHER
-ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:31:17-77
+ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:32:17-77
 	android:name
-		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:31:27-74
-service#com.djpro.mixer.video.RecordingService
-ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:34:9-38:58
+		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:32:27-74
+service#com.ultimate.dj.video.RecordingService
+ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:35:9-39:58
 	android:exported
-		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:36:13-37
+		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:37:13-37
 	tools:ignore
-		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:38:13-55
+		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:39:13-55
 	android:foregroundServiceType
-		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:37:13-71
+		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:38:13-71
 	android:name
-		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:35:13-51
+		ADDED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml:36:13-51
 uses-sdk
 INJECTED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml reason: use-sdk injection requested
 INJECTED from /home/runner/work/Dj-video/Dj-video/app/src/main/AndroidManifest.xml

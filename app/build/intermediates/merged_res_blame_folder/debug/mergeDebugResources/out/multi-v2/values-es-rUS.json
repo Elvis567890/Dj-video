@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.djpro.mixer.app-mergeDebugResources-51:/values-es-rUS/values-es-rUS.xml",
+            "outputFile": "com.ultimate.dj.app-mergeDebugResources-51:/values-es-rUS/values-es-rUS.xml",
             "map": [
                 {
                     "source": "/home/runner/.gradle/caches/transforms-4/8e0a0bff2d388b6446750efdf4a5758f/transformed/core-1.13.1/res/values-es-rUS/values-es-rUS.xml",

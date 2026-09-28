@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.djpro.mixer.app-mergeDebugResources-51:/values-bg/values-bg.xml",
+            "outputFile": "com.ultimate.dj.app-mergeDebugResources-51:/values-bg/values-bg.xml",
             "map": [
                 {
                     "source": "/home/runner/.gradle/caches/transforms-4/95bfd944e3a9b023aacdd5e69eb36501/transformed/media3-exoplayer-1.4.1/res/values-bg/values-bg.xml",
