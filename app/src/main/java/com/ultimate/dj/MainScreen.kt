@@ -50,6 +50,7 @@ fun MainScreen(engine: AudioEngine, recorder: MixRecorder, activity: Activity) {
     var theaterMode by remember { mutableStateOf(false) }
     var libraryOpen by remember { mutableStateOf(false) }
     var libraryTarget by remember { mutableStateOf(0) }
+    var fxPanelOpen by remember { mutableStateOf(false) }
     var keyLockOn by remember { mutableStateOf(false) }
     var fxChainFilter by remember { mutableStateOf(false) }
     var fxChainEcho by remember { mutableStateOf(false) }
@@ -208,10 +209,7 @@ fun MainScreen(engine: AudioEngine, recorder: MixRecorder, activity: Activity) {
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically) {
                     BarBtn("LIB", Neon.BLUE, libraryOpen) { openLibrary(activeDeckA) }
-                    BarBtn("FX", Neon.PURPLE, fxChainFilter || fxChainEcho) {
-                        fxChainFilter = !fxChainFilter
-                        engine.setFilter(fxChainFilter)
-                    }
+                    BarBtn("FX", Neon.PURPLE, fxPanelOpen) { fxPanelOpen = true }
                     BarBtn("KEY", Neon.GREEN, keyLockOn) {
                         keyLockOn = !keyLockOn
                         engine.setKeyLock(keyLockOn)
@@ -246,8 +244,28 @@ fun MainScreen(engine: AudioEngine, recorder: MixRecorder, activity: Activity) {
                             engine.loadDeck(libraryTarget, track.uri, track.title)
                             libraryOpen = false
                         },
+                        onPickForOtherDeck = { track ->
+                            val other = if (libraryTarget == activeDeckA) activeDeckB else activeDeckA
+                            engine.loadDeck(other, track.uri, track.title)
+                            libraryOpen = false
+                        },
                         onClose = { libraryOpen = false },
                         modifier = Modifier.fillMaxSize().padding(24.dp)
+                    )
+                }
+            }
+
+            AnimatedVisibility(visible = fxPanelOpen, enter = fadeIn(), exit = fadeOut()) {
+                Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.85f)),
+                    contentAlignment = Alignment.Center) {
+                    FxPanel(
+                        onFxChange = { _: Int, name: String, _: Float, enabled: Boolean, _: Int ->
+                            engine.setEcho(name == "ECHO" && enabled)
+                            engine.setFilter(name == "FILTER" && enabled)
+                            if (name == "FILTER") engine.setFilterHighPass(name == "FILTER" && enabled)
+                        },
+                        onClose = { fxPanelOpen = false },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp)
                     )
                 }
             }

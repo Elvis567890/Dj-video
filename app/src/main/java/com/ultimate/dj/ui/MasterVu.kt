@@ -31,7 +31,6 @@ fun MasterVu(playing: Boolean, modifier: Modifier = Modifier) {
             val color = when {
                 t > 0.90f -> Color(0xFFEF4444)
                 t > 0.75f -> Color(0xFFEAB308)
-                t > 0.55f -> Color(0xFF22C55E)
                 else -> Color(0xFF22C55E)
             }
             drawRect(color = color.copy(alpha = if (lit) 0.95f else 0.08f), topLeft = Offset(0f, y), size = Size(w, segH))
