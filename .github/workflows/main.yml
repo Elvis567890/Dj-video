@@ -88,8 +88,8 @@ jobs:
                   applicationId = "com.ultimate.dj"
                   minSdk = 24
                   targetSdk = 34
-                  versionCode = 50
-                  versionName = "5.0.0"
+                  versionCode = 60
+                  versionName = "6.0.0"
               }
               buildTypes { release { isMinifyEnabled = false } }
               compileOptions {
@@ -1989,7 +1989,6 @@ jobs:
                       val color = when {
                           t > 0.90f -> Color(0xFFEF4444)
                           t > 0.75f -> Color(0xFFEAB308)
-                          t > 0.55f -> Color(0xFF22C55E)
                           else -> Color(0xFF22C55E)
                       }
                       drawRect(color = color.copy(alpha = if (lit) 0.95f else 0.08f), topLeft = Offset(0f, y), size = Size(w, segH))
@@ -2317,6 +2316,148 @@ jobs:
           }
           EOF
 
+      - name: UI FxPanel
+        run: |
+          cat > app/src/main/java/com/ultimate/dj/ui/FxPanel.kt << 'EOF'
+          package com.ultimate.dj.ui
+          import androidx.compose.foundation.background
+          import androidx.compose.foundation.border
+          import androidx.compose.foundation.clickable
+          import androidx.compose.foundation.layout.*
+          import androidx.compose.foundation.shape.RoundedCornerShape
+          import androidx.compose.material3.Slider
+          import androidx.compose.material3.SliderDefaults
+          import androidx.compose.material3.Text
+          import androidx.compose.runtime.*
+          import androidx.compose.ui.Alignment
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.draw.clip
+          import androidx.compose.ui.text.font.FontWeight
+          import androidx.compose.ui.unit.dp
+          import androidx.compose.ui.unit.sp
+          import com.ultimate.dj.Neon
+          val FX_NAMES = listOf("ECHO", "FILTER", "REVERB", "FLANGER", "PHASER", "ROLL", "CENSOR", "DELAY")
+          @Composable
+          fun FxPanel(
+              onFxChange: (slot: Int, fxName: String, amount: Float, enabled: Boolean, assignDeck: Int) -> Unit,
+              onClose: () -> Unit,
+              modifier: Modifier = Modifier
+          ) {
+              var slot1Name by remember { mutableStateOf("ECHO") }
+              var slot2Name by remember { mutableStateOf("FILTER") }
+              var slot1Amount by remember { mutableFloatStateOf(0.5f) }
+              var slot2Amount by remember { mutableFloatStateOf(0.5f) }
+              var slot1On by remember { mutableStateOf(false) }
+              var slot2On by remember { mutableStateOf(false) }
+              var slot1Deck by remember { mutableStateOf(0) }
+              var slot2Deck by remember { mutableStateOf(1) }
+              Column(modifier = modifier.fillMaxWidth()
+                  .clip(RoundedCornerShape(8.dp))
+                  .background(Neon.PANEL_GLASS)
+                  .border(0.5.dp, Neon.PURPLE.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                  .padding(10.dp)) {
+                  Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                      verticalAlignment = Alignment.CenterVertically) {
+                      Text("FX RACK", color = Neon.PURPLE, fontSize = 10.sp,
+                          fontWeight = FontWeight.Bold, letterSpacing = 4.sp)
+                      Spacer(Modifier.weight(1f))
+                      Box(modifier = Modifier.clip(RoundedCornerShape(4.dp))
+                          .background(Neon.BTN_BG)
+                          .border(0.5.dp, Neon.TEXT_FAINT.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                          .clickable { onClose() }
+                          .padding(horizontal = 10.dp, vertical = 4.dp)) {
+                          Text("CLOSE", color = Neon.TEXT_DIM, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                      }
+                  }
+                  Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                      FxSlot(1, slot1Name, slot1Amount, slot1On, slot1Deck,
+                          { slot1Name = it; onFxChange(0, it, slot1Amount, slot1On, slot1Deck) },
+                          { slot1Amount = it; onFxChange(0, slot1Name, it, slot1On, slot1Deck) },
+                          { slot1On = it; onFxChange(0, slot1Name, slot1Amount, it, slot1Deck) },
+                          { slot1Deck = it; onFxChange(0, slot1Name, slot1Amount, slot1On, it) },
+                          Modifier.weight(1f))
+                      FxSlot(2, slot2Name, slot2Amount, slot2On, slot2Deck,
+                          { slot2Name = it; onFxChange(1, it, slot2Amount, slot2On, slot2Deck) },
+                          { slot2Amount = it; onFxChange(1, slot2Name, it, slot2On, slot2Deck) },
+                          { slot2On = it; onFxChange(1, slot2Name, slot2Amount, it, slot2Deck) },
+                          { slot2Deck = it; onFxChange(1, slot2Name, slot2Amount, slot2On, it) },
+                          Modifier.weight(1f))
+                  }
+              }
+          }
+          @Composable
+          private fun FxSlot(
+              slotNum: Int,
+              name: String, amount: Float, enabled: Boolean, deck: Int,
+              onName: (String) -> Unit,
+              onAmount: (Float) -> Unit,
+              onEnabled: (Boolean) -> Unit,
+              onDeck: (Int) -> Unit,
+              modifier: Modifier = Modifier
+          ) {
+              val accent = if (slotNum == 1) Neon.PURPLE else Neon.BLUE
+              Column(modifier = modifier
+                  .clip(RoundedCornerShape(6.dp))
+                  .background(Neon.PANEL_DARK)
+                  .border(0.5.dp, accent.copy(alpha = if (enabled) 0.9f else 0.25f), RoundedCornerShape(6.dp))
+                  .padding(8.dp),
+                  verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                  Row(modifier = Modifier.fillMaxWidth(),
+                      horizontalArrangement = Arrangement.SpaceBetween,
+                      verticalAlignment = Alignment.CenterVertically) {
+                      Text("FX $slotNum", color = accent, fontSize = 8.sp,
+                          fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                      Box(modifier = Modifier.clip(RoundedCornerShape(4.dp))
+                          .background(if (enabled) accent.copy(alpha = 0.30f) else Neon.BTN_BG)
+                          .border(0.5.dp, accent.copy(alpha = if (enabled) 1f else 0.25f), RoundedCornerShape(4.dp))
+                          .clickable { onEnabled(!enabled) }
+                          .padding(horizontal = 8.dp, vertical = 3.dp)) {
+                          Text(if (enabled) "ON" else "OFF", color = accent, fontSize = 7.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                      }
+                  }
+                  Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                      for (fx in FX_NAMES) {
+                          val sel = fx == name
+                          Box(modifier = Modifier.weight(1f).clip(RoundedCornerShape(3.dp))
+                              .background(if (sel) accent.copy(alpha = 0.25f) else Neon.BTN_BG)
+                              .border(0.5.dp, accent.copy(alpha = if (sel) 0.9f else 0.15f), RoundedCornerShape(3.dp))
+                              .clickable { onName(fx) }
+                              .padding(vertical = 3.dp), contentAlignment = Alignment.Center) {
+                              Text(fx.take(3), color = if (sel) accent else Neon.TEXT_FAINT,
+                                  fontSize = 6.sp, fontWeight = FontWeight.Bold)
+                          }
+                      }
+                  }
+                  Text(name, color = accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                  Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                      Text("AMT", color = Neon.TEXT_FAINT, fontSize = 7.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                      Spacer(Modifier.width(4.dp))
+                      Slider(value = amount, onValueChange = onAmount,
+                          colors = SliderDefaults.colors(thumbColor = accent,
+                              activeTrackColor = accent.copy(alpha = 0.6f),
+                              inactiveTrackColor = Neon.BORDER_SOFT),
+                          modifier = Modifier.weight(1f).height(16.dp))
+                      Text("${(amount * 100).toInt()}", color = accent, fontSize = 8.sp, fontWeight = FontWeight.Bold,
+                          modifier = Modifier.width(24.dp))
+                  }
+                  Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                      for (d in 0..1) {
+                          val sel = deck == d
+                          Box(modifier = Modifier.weight(1f).clip(RoundedCornerShape(3.dp))
+                              .background(if (sel) accent.copy(alpha = 0.25f) else Neon.BTN_BG)
+                              .border(0.5.dp, accent.copy(alpha = if (sel) 0.9f else 0.20f), RoundedCornerShape(3.dp))
+                              .clickable { onDeck(d) }
+                              .padding(vertical = 4.dp), contentAlignment = Alignment.Center) {
+                              Text(if (d == 0) "DECK A" else "DECK B",
+                                  color = if (sel) accent else Neon.TEXT_FAINT,
+                                  fontSize = 7.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                          }
+                      }
+                  }
+              }
+          }
+          EOF
+
       - name: LibraryScanner and Browser
         run: |
           cat > app/src/main/java/com/ultimate/dj/audio/LibraryScanner.kt << 'EOF'
@@ -2329,22 +2470,29 @@ jobs:
               val uri: String,
               val title: String,
               val artist: String,
+              val album: String,
               val durationMs: Long,
-              val isVideo: Boolean
+              val isVideo: Boolean,
+              val bpm: Float = 0f,
+              val key: String = "",
+              val dateAdded: Long = 0L
           )
           object LibraryScanner {
-              fun scan(context: Context, query: String = ""): List<Track> {
+              fun scan(context: Context, query: String = "", filter: String = "ALL"): List<Track> {
                   val out = mutableListOf<Track>()
-                  scanAudio(context, query, out)
-                  scanVideo(context, query, out)
-                  return out.sortedBy { it.title.lowercase() }
+                  if (filter == "ALL" || filter == "AUDIO" || filter == "RECENT") scanAudio(context, query, out)
+                  if (filter == "ALL" || filter == "VIDEO") scanVideo(context, query, out)
+                  val sorted = out.sortedBy { it.title.lowercase() }
+                  return if (filter == "RECENT") sorted.sortedByDescending { it.dateAdded }.take(100) else sorted
               }
               private fun scanAudio(context: Context, query: String, out: MutableList<Track>) {
                   val proj = arrayOf(
                       MediaStore.Audio.Media._ID,
                       MediaStore.Audio.Media.TITLE,
                       MediaStore.Audio.Media.ARTIST,
-                      MediaStore.Audio.Media.DURATION
+                      MediaStore.Audio.Media.ALBUM,
+                      MediaStore.Audio.Media.DURATION,
+                      MediaStore.Audio.Media.DATE_ADDED
                   )
                   try {
                       val sel = if (query.isBlank()) null else "${MediaStore.Audio.Media.TITLE} LIKE ?"
@@ -2356,13 +2504,16 @@ jobs:
                           val idI = it.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
                           val tiI = it.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
                           val arI = it.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
+                          val alI = it.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
                           val duI = it.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
+                          val daI = it.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_ADDED)
                           while (it.moveToNext() && out.size < 500) {
                               val id = it.getLong(idI)
                               val uri = android.content.ContentUris.withAppendedId(
                                   MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id).toString()
                               out.add(Track(id, uri, it.getString(tiI) ?: "Unknown",
-                                  it.getString(arI) ?: "Unknown", it.getLong(duI), false))
+                                  it.getString(arI) ?: "Unknown", it.getString(alI) ?: "",
+                                  it.getLong(duI), false, 0f, "", it.getLong(daI)))
                           }
                       }
                   } catch (_: Throwable) {}
@@ -2371,7 +2522,8 @@ jobs:
                   val proj = arrayOf(
                       MediaStore.Video.Media._ID,
                       MediaStore.Video.Media.TITLE,
-                      MediaStore.Video.Media.DURATION
+                      MediaStore.Video.Media.DURATION,
+                      MediaStore.Video.Media.DATE_ADDED
                   )
                   try {
                       val sel = if (query.isBlank()) null else "${MediaStore.Video.Media.TITLE} LIKE ?"
@@ -2383,12 +2535,13 @@ jobs:
                           val idI = it.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
                           val tiI = it.getColumnIndexOrThrow(MediaStore.Video.Media.TITLE)
                           val duI = it.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
+                          val daI = it.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_ADDED)
                           while (it.moveToNext() && out.size < 500) {
                               val id = it.getLong(idI)
                               val uri = android.content.ContentUris.withAppendedId(
                                   MediaStore.Video.Media.EXTERNAL_CONTENT_URI, id).toString()
                               out.add(Track(id, uri, it.getString(tiI) ?: "Video",
-                                  "Video", it.getLong(duI), true))
+                                  "Video", "", it.getLong(duI), true, 0f, "", it.getLong(daI)))
                           }
                       }
                   } catch (_: Throwable) {}
@@ -2421,19 +2574,23 @@ jobs:
           import com.ultimate.dj.audio.Track
           import kotlinx.coroutines.Dispatchers
           import kotlinx.coroutines.withContext
+          private val FILTERS = listOf("ALL", "AUDIO", "VIDEO", "RECENT")
           @Composable
           fun LibraryBrowser(
               context: Context,
               targetDeckName: String,
               onPickTrack: (Track) -> Unit,
+              onPickForOtherDeck: (Track) -> Unit,
               onClose: () -> Unit,
               modifier: Modifier = Modifier
           ) {
               var query by remember { mutableStateOf("") }
+              var filter by remember { mutableStateOf("ALL") }
               var tracks by remember { mutableStateOf<List<Track>>(emptyList()) }
-              LaunchedEffect(query) {
+              var selected by remember { mutableStateOf<Track?>(null) }
+              LaunchedEffect(query, filter) {
                   tracks = withContext(Dispatchers.IO) {
-                      try { LibraryScanner.scan(context, query) } catch (_: Throwable) { emptyList() }
+                      try { LibraryScanner.scan(context, query, filter) } catch (_: Throwable) { emptyList() }
                   }
               }
               Column(modifier = modifier.fillMaxWidth().fillMaxHeight()
@@ -2441,6 +2598,7 @@ jobs:
                   .background(Neon.PANEL_GLASS)
                   .border(0.5.dp, Neon.BLUE.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
                   .padding(12.dp)) {
+
                   Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                       verticalAlignment = Alignment.CenterVertically) {
                       Text("LIBRARY", color = Neon.BLUE, fontSize = 12.sp,
@@ -2449,6 +2607,8 @@ jobs:
                       Text("Load into $targetDeckName",
                           color = Neon.TEXT_DIM, fontSize = 9.sp, fontWeight = FontWeight.Medium)
                       Spacer(Modifier.weight(1f))
+                      Text("${tracks.size} tracks", color = Neon.TEXT_FAINT, fontSize = 9.sp)
+                      Spacer(Modifier.width(12.dp))
                       Box(modifier = Modifier.clip(RoundedCornerShape(4.dp))
                           .background(Neon.BTN_BG)
                           .border(0.5.dp, Neon.TEXT_FAINT.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
@@ -2457,43 +2617,106 @@ jobs:
                           Text("CLOSE", color = Neon.TEXT_DIM, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                       }
                   }
+
                   OutlinedTextField(
                       value = query, onValueChange = { query = it },
-                      placeholder = { Text("Search by title or artist...", color = Neon.TEXT_FAINT, fontSize = 10.sp) },
+                      placeholder = { Text("Search title or artist...", color = Neon.TEXT_FAINT, fontSize = 10.sp) },
                       singleLine = true,
-                      modifier = Modifier.fillMaxWidth().height(48.dp)
+                      modifier = Modifier.fillMaxWidth().height(46.dp)
                   )
-                  Spacer(Modifier.height(8.dp))
+
+                  Spacer(Modifier.height(6.dp))
+
+                  Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                      for (f in FILTERS) {
+                          val sel = f == filter
+                          Box(modifier = Modifier.clip(RoundedCornerShape(4.dp))
+                              .background(if (sel) Neon.BLUE.copy(alpha = 0.20f) else Neon.BTN_BG)
+                              .border(0.5.dp, Neon.BLUE.copy(alpha = if (sel) 0.9f else 0.20f), RoundedCornerShape(4.dp))
+                              .clickable { filter = f }
+                              .padding(horizontal = 10.dp, vertical = 4.dp)) {
+                              Text(f, color = if (sel) Neon.BLUE else Neon.TEXT_DIM,
+                                  fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                          }
+                      }
+                  }
+
+                  Spacer(Modifier.height(6.dp))
+
+                  Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp)) {
+                      Text("TITLE", color = Neon.TEXT_FAINT, fontSize = 7.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, modifier = Modifier.weight(2.2f))
+                      Text("ARTIST", color = Neon.TEXT_FAINT, fontSize = 7.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, modifier = Modifier.weight(1.4f))
+                      Text("BPM", color = Neon.TEXT_FAINT, fontSize = 7.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, modifier = Modifier.width(44.dp))
+                      Text("KEY", color = Neon.TEXT_FAINT, fontSize = 7.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, modifier = Modifier.width(36.dp))
+                      Text("TIME", color = Neon.TEXT_FAINT, fontSize = 7.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, modifier = Modifier.width(44.dp))
+                  }
+
+                  Box(modifier = Modifier.fillMaxWidth().height(0.5.dp).background(Neon.BORDER_SOFT))
+
                   if (tracks.isEmpty()) {
                       Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                          Text("No music or video found on this device.",
+                          Text("No tracks found.\nGrant storage permission and add music/videos.",
                               color = Neon.TEXT_FAINT, fontSize = 10.sp)
                       }
                   } else {
                       LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
                           items(tracks) { track ->
+                              val isSel = selected?.uri == track.uri
                               Row(modifier = Modifier.fillMaxWidth()
-                                  .clickable { onPickTrack(track) }
-                                  .padding(vertical = 8.dp, horizontal = 4.dp),
+                                  .background(if (isSel) Neon.BLUE.copy(alpha = 0.12f) else Color.Transparent)
+                                  .clickable { selected = track }
+                                  .padding(vertical = 6.dp, horizontal = 4.dp),
                                   verticalAlignment = Alignment.CenterVertically) {
-                                  Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(4.dp))
-                                      .background(if (track.isVideo) Neon.AMBER.copy(alpha = 0.15f) else Neon.BLUE.copy(alpha = 0.15f))
-                                      .border(0.5.dp, if (track.isVideo) Neon.AMBER.copy(alpha = 0.6f) else Neon.BLUE.copy(alpha = 0.6f), RoundedCornerShape(4.dp)),
+                                  Box(modifier = Modifier.size(20.dp).clip(RoundedCornerShape(3.dp))
+                                      .background(if (track.isVideo) Neon.AMBER.copy(alpha = 0.18f) else Neon.BLUE.copy(alpha = 0.18f))
+                                      .border(0.5.dp, if (track.isVideo) Neon.AMBER.copy(alpha = 0.7f) else Neon.BLUE.copy(alpha = 0.7f), RoundedCornerShape(3.dp)),
                                       contentAlignment = Alignment.Center) {
                                       Text(if (track.isVideo) "V" else "♪",
                                           color = if (track.isVideo) Neon.AMBER else Neon.BLUE,
-                                          fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                          fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                   }
-                                  Spacer(Modifier.width(10.dp))
-                                  Column(modifier = Modifier.weight(1f)) {
-                                      Text(track.title.take(60), color = Neon.TEXT, fontSize = 11.sp,
-                                          fontWeight = FontWeight.Medium, maxLines = 1)
-                                      Text(track.artist.take(30), color = Neon.TEXT_DIM, fontSize = 9.sp, maxLines = 1)
-                                  }
-                                  Spacer(Modifier.width(8.dp))
+                                  Spacer(Modifier.width(6.dp))
+                                  Text(track.title.take(45), color = Neon.TEXT, fontSize = 10.sp,
+                                      fontWeight = FontWeight.Medium, modifier = Modifier.weight(2.2f), maxLines = 1)
+                                  Text(track.artist.take(20), color = Neon.TEXT_DIM, fontSize = 9.sp,
+                                      modifier = Modifier.weight(1.4f), maxLines = 1)
+                                  Text(if (track.bpm > 0) "%.0f".format(track.bpm) else "—",
+                                      color = Neon.TEXT_DIM, fontSize = 9.sp, modifier = Modifier.width(44.dp))
+                                  Text(if (track.key.isNotEmpty()) track.key else "—",
+                                      color = Neon.TEXT_DIM, fontSize = 9.sp, modifier = Modifier.width(36.dp))
                                   Text("${track.durationMs / 1000 / 60}:${"%02d".format((track.durationMs / 1000) % 60)}",
-                                      color = Neon.TEXT_DIM, fontSize = 9.sp, fontWeight = FontWeight.Medium)
+                                      color = Neon.TEXT_DIM, fontSize = 9.sp, modifier = Modifier.width(44.dp))
                               }
+                          }
+                      }
+                  }
+
+                  if (selected != null) {
+                      Spacer(Modifier.height(8.dp))
+                      Row(modifier = Modifier.fillMaxWidth()
+                          .clip(RoundedCornerShape(6.dp))
+                          .background(Neon.PANEL_DARK)
+                          .border(0.5.dp, Neon.BLUE.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                          .padding(10.dp),
+                          verticalAlignment = Alignment.CenterVertically) {
+                          Column(modifier = Modifier.weight(1f)) {
+                              Text(selected!!.title, color = Neon.TEXT, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                              Text(selected!!.artist, color = Neon.TEXT_DIM, fontSize = 9.sp, maxLines = 1)
+                          }
+                          Box(modifier = Modifier.clip(RoundedCornerShape(4.dp))
+                              .background(Neon.BLUE.copy(alpha = 0.20f))
+                              .border(0.5.dp, Neon.BLUE, RoundedCornerShape(4.dp))
+                              .clickable { onPickTrack(selected!!) }
+                              .padding(horizontal = 14.dp, vertical = 8.dp)) {
+                              Text("LOAD $targetDeckName", color = Neon.BLUE, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                          }
+                          Spacer(Modifier.width(6.dp))
+                          Box(modifier = Modifier.clip(RoundedCornerShape(4.dp))
+                              .background(Neon.BTN_BG)
+                              .border(0.5.dp, Neon.TEXT_FAINT.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                              .clickable { onPickForOtherDeck(selected!!) }
+                              .padding(horizontal = 12.dp, vertical = 8.dp)) {
+                              Text("OTHER DECK", color = Neon.TEXT_DIM, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                           }
                       }
                   }
@@ -2594,6 +2817,7 @@ jobs:
               var theaterMode by remember { mutableStateOf(false) }
               var libraryOpen by remember { mutableStateOf(false) }
               var libraryTarget by remember { mutableStateOf(0) }
+              var fxPanelOpen by remember { mutableStateOf(false) }
               var keyLockOn by remember { mutableStateOf(false) }
               var fxChainFilter by remember { mutableStateOf(false) }
               var fxChainEcho by remember { mutableStateOf(false) }
@@ -2752,10 +2976,7 @@ jobs:
                               horizontalArrangement = Arrangement.spacedBy(4.dp),
                               verticalAlignment = Alignment.CenterVertically) {
                               BarBtn("LIB", Neon.BLUE, libraryOpen) { openLibrary(activeDeckA) }
-                              BarBtn("FX", Neon.PURPLE, fxChainFilter || fxChainEcho) {
-                                  fxChainFilter = !fxChainFilter
-                                  engine.setFilter(fxChainFilter)
-                              }
+                              BarBtn("FX", Neon.PURPLE, fxPanelOpen) { fxPanelOpen = true }
                               BarBtn("KEY", Neon.GREEN, keyLockOn) {
                                   keyLockOn = !keyLockOn
                                   engine.setKeyLock(keyLockOn)
@@ -2790,8 +3011,28 @@ jobs:
                                       engine.loadDeck(libraryTarget, track.uri, track.title)
                                       libraryOpen = false
                                   },
+                                  onPickForOtherDeck = { track ->
+                                      val other = if (libraryTarget == activeDeckA) activeDeckB else activeDeckA
+                                      engine.loadDeck(other, track.uri, track.title)
+                                      libraryOpen = false
+                                  },
                                   onClose = { libraryOpen = false },
                                   modifier = Modifier.fillMaxSize().padding(24.dp)
+                              )
+                          }
+                      }
+
+                      AnimatedVisibility(visible = fxPanelOpen, enter = fadeIn(), exit = fadeOut()) {
+                          Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.85f)),
+                              contentAlignment = Alignment.Center) {
+                              FxPanel(
+                                  onFxChange = { _: Int, name: String, _: Float, enabled: Boolean, _: Int ->
+                                      engine.setEcho(name == "ECHO" && enabled)
+                                      engine.setFilter(name == "FILTER" && enabled)
+                                      if (name == "FILTER") engine.setFilterHighPass(name == "FILTER" && enabled)
+                                  },
+                                  onClose = { fxPanelOpen = false },
+                                  modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp)
                               )
                           }
                       }
@@ -3100,5 +3341,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git diff --cached --quiet || git commit -m "ULTIMATE v5.0.0: PlayerView via XML layout with texture_view surface"
+          git diff --cached --quiet || git commit -m "ULTIMATE v6.0.0: Serato-style library with BPM/Key + 2-slot FX rack"
           git push || echo "push failed"
