@@ -52,8 +52,6 @@ fun MainScreen(engine: AudioEngine, recorder: MixRecorder, activity: Activity) {
     var libraryTarget by remember { mutableStateOf(0) }
     var fxPanelOpen by remember { mutableStateOf(false) }
     var keyLockOn by remember { mutableStateOf(false) }
-    var fxChainFilter by remember { mutableStateOf(false) }
-    var fxChainEcho by remember { mutableStateOf(false) }
     var countdown by remember { mutableStateOf(0) }
     val recordLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -153,7 +151,7 @@ fun MainScreen(engine: AudioEngine, recorder: MixRecorder, activity: Activity) {
                     }
                 }
 
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(6.dp))
 
                 VideoStrip(deckA, deckB, videoCrossfader, videoTransition, fullscreen = false)
 
@@ -170,7 +168,7 @@ fun MainScreen(engine: AudioEngine, recorder: MixRecorder, activity: Activity) {
                         modifier = Modifier.weight(1f))
                 }
 
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(6.dp))
 
                 Row(modifier = Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     DeckPanel(
@@ -262,7 +260,7 @@ fun MainScreen(engine: AudioEngine, recorder: MixRecorder, activity: Activity) {
                         onFxChange = { _: Int, name: String, _: Float, enabled: Boolean, _: Int ->
                             engine.setEcho(name == "ECHO" && enabled)
                             engine.setFilter(name == "FILTER" && enabled)
-                            if (name == "FILTER") engine.setFilterHighPass(name == "FILTER" && enabled)
+                            if (name == "FILTER") engine.setFilterHighPass(enabled)
                         },
                         onClose = { fxPanelOpen = false },
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp)
@@ -288,7 +286,7 @@ fun MainScreen(engine: AudioEngine, recorder: MixRecorder, activity: Activity) {
 private fun VideoStrip(deckA: DeckPlayer, deckB: DeckPlayer, videoCrossfader: Float,
                        transition: VideoTransition, fullscreen: Boolean) {
     val mod = if (fullscreen) Modifier.fillMaxSize()
-              else Modifier.fillMaxWidth().aspectRatio(21f / 9f)
+              else Modifier.fillMaxWidth().heightIn(min = 120.dp, max = 200.dp)
     Box(modifier = mod
         .clip(RoundedCornerShape(if (fullscreen) 0.dp else 6.dp))
         .background(Color.Black)
