@@ -88,8 +88,8 @@ jobs:
                   applicationId = "com.ultimate.dj"
                   minSdk = 24
                   targetSdk = 34
-                  versionCode = 71
-                  versionName = "7.1.0"
+                  versionCode = 100
+                  versionName = "10.0.0"
               }
               buildTypes { release { isMinifyEnabled = false } }
               compileOptions {
@@ -1838,20 +1838,20 @@ jobs:
               modifier: Modifier = Modifier
           ) {
               var value by remember { mutableFloatStateOf(initialValue) }
-              Box(modifier = modifier.width(26.dp).fillMaxHeight().pointerInput(Unit) {
+              Box(modifier = modifier.width(24.dp).fillMaxHeight().pointerInput(Unit) {
                   detectDragGestures { change: PointerInputChange, drag: Offset ->
                       change.consume()
                       value = (value + (-drag.y / size.height)).coerceIn(0f, 1f)
                       onValueChange(value)
                   }
               }) {
-                  Canvas(modifier = Modifier.fillMaxHeight().width(26.dp)) {
+                  Canvas(modifier = Modifier.fillMaxHeight().width(24.dp)) {
                       val cx = size.width / 2f; val h = size.height
-                      drawLine(Color(0xFF25252E), Offset(cx, 8f), Offset(cx, h - 8f), 2f, StrokeCap.Round)
-                      val y = h - value * (h - 16f) - 8f
-                      drawLine(accent.copy(alpha = 0.55f), Offset(cx, h - 8f), Offset(cx, y), 2f, StrokeCap.Round)
-                      drawRoundRect(accent.copy(alpha = 0.95f), Offset(cx - 11f, y - 5f), Size(22f, 10f), CornerRadius(2f))
-                      drawRoundRect(Color(0x50000000), Offset(cx - 11f, y - 5f), Size(22f, 10f), CornerRadius(2f))
+                      drawLine(Color(0xFF25252E), Offset(cx, 6f), Offset(cx, h - 6f), 2f, StrokeCap.Round)
+                      val y = h - value * (h - 12f) - 6f
+                      drawLine(accent.copy(alpha = 0.55f), Offset(cx, h - 6f), Offset(cx, y), 2f, StrokeCap.Round)
+                      drawRoundRect(accent.copy(alpha = 0.95f), Offset(cx - 10f, y - 4f), Size(20f, 8f), CornerRadius(2f))
+                      drawRoundRect(Color(0x50000000), Offset(cx - 10f, y - 4f), Size(20f, 8f), CornerRadius(2f))
                   }
               }
           }
@@ -1893,7 +1893,7 @@ jobs:
               initialValue: Float = 0f,
               minValue: Float = -26f,
               maxValue: Float = 6f,
-              size: androidx.compose.ui.unit.Dp = 36.dp,
+              size: androidx.compose.ui.unit.Dp = 30.dp,
               onValueChange: (Float) -> Unit = {},
               modifier: Modifier = Modifier
           ) {
@@ -1917,10 +1917,10 @@ jobs:
                       val n = ((value - minValue) / range).coerceIn(0f, 1f)
                       drawArc(accent, start, sweep * n, false, Offset(cx - r, cy - r), Size(r * 2, r * 2), style = Stroke(2f, cap = StrokeCap.Round))
                       val aRad = Math.toRadians((start + sweep * n).toDouble())
-                      drawLine(Color.White.copy(alpha = 0.9f), Offset(cx, cy), Offset(cx + (r - 5f) * cos(aRad).toFloat(), cy + (r - 5f) * sin(aRad).toFloat()), 1.5f, StrokeCap.Round)
-                      drawCircle(Color(0xFF0A0A0F), 2.5f, Offset(cx, cy))
+                      drawLine(Color.White.copy(alpha = 0.9f), Offset(cx, cy), Offset(cx + (r - 4f) * cos(aRad).toFloat(), cy + (r - 4f) * sin(aRad).toFloat()), 1.5f, StrokeCap.Round)
+                      drawCircle(Color(0xFF0A0A0F), 2f, Offset(cx, cy))
                   }
-                  Text(label, color = accent.copy(alpha = 0.85f), fontSize = 6.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.BottomCenter))
+                  Text(label, color = accent.copy(alpha = 0.85f), fontSize = 5.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.BottomCenter))
               }
           }
           EOF
@@ -1996,8 +1996,8 @@ jobs:
               onSelectB: (Int) -> Unit,
               modifier: Modifier = Modifier
           ) {
-              Row(modifier = modifier.fillMaxWidth().height(38.dp),
-                  horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+              Row(modifier = modifier.fillMaxWidth().height(32.dp),
+                  horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                   decks.forEachIndexed { idx, deck ->
                       val accent = Neon.DECK_COLORS[idx % Neon.DECK_COLORS.size]
                       val isA = idx == activeA; val isB = idx == activeB
@@ -2017,13 +2017,13 @@ jobs:
                           contentAlignment = Alignment.Center
                       ) {
                           Row(verticalAlignment = Alignment.CenterVertically) {
-                              Text("Deck ${idx + 1}",
+                              Text("D${idx + 1}",
                                   color = if (active) Color.White else Neon.TEXT_DIM,
-                                  fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                  fontSize = 9.sp, fontWeight = FontWeight.Bold)
                               if (active) {
-                                  Spacer(Modifier.width(4.dp))
+                                  Spacer(Modifier.width(3.dp))
                                   Text(if (isA) "A" else "B",
-                                      color = accent, fontSize = 9.sp, fontWeight = FontWeight.Black)
+                                      color = accent, fontSize = 8.sp, fontWeight = FontWeight.Black)
                               }
                           }
                       }
@@ -2354,6 +2354,7 @@ jobs:
           import com.ultimate.dj.ui.*
           import com.ultimate.dj.video.MixRecorder
           import kotlinx.coroutines.delay
+
           @Composable
           fun MainScreen(engine: AudioEngine, recorder: MixRecorder, activity: Activity) {
               val context = LocalContext.current
@@ -2370,6 +2371,7 @@ jobs:
               var libraryOpen by remember { mutableStateOf(false) }
               var libraryTarget by remember { mutableStateOf(0) }
               var countdown by remember { mutableStateOf(0) }
+
               val recordLauncher = rememberLauncherForActivityResult(
                   contract = ActivityResultContracts.StartActivityForResult()
               ) { result ->
@@ -2382,6 +2384,7 @@ jobs:
                       }
                   }
               }
+
               LaunchedEffect(countdown) {
                   if (countdown > 0) {
                       delay(1000)
@@ -2389,6 +2392,7 @@ jobs:
                       if (countdown == 0) theaterMode = true
                   }
               }
+
               LaunchedEffect(Unit) {
                   while (true) {
                       anyPlaying = engine.decks.any { it.isPlaying }
@@ -2397,20 +2401,25 @@ jobs:
                       delay(1000)
                   }
               }
+
               fun toggleRecording() {
                   if (recording) {
                       val uri = recorder.stop()
-                      recording = false; recordingTime = 0; theaterMode = false
+                      recording = false
+                      recordingTime = 0
+                      theaterMode = false
                       if (uri != null) Toast.makeText(context, "Saved to Movies/ULTIMATE/${recorder.lastSavedName}", Toast.LENGTH_LONG).show()
                       else Toast.makeText(context, "Recording failed", Toast.LENGTH_SHORT).show()
                   } else {
                       recorder.buildIntent()?.let { recordLauncher.launch(it) }
                   }
               }
+
               fun openLibrary(targetDeck: Int) {
                   libraryTarget = targetDeck
                   libraryOpen = true
               }
+
               val deckA = engine.decks[activeDeckA]
               val deckB = engine.decks[activeDeckB]
               val accentA = Neon.BLUE
@@ -2418,57 +2427,77 @@ jobs:
 
               Box(modifier = Modifier.fillMaxSize().background(Neon.BG)) {
                   if (theaterMode) {
-                      Box(modifier = Modifier.fillMaxSize().background(Color.Black)
-                          .pointerInput(Unit) { detectTapGestures(onTap = { theaterMode = false }) }) {
+                      Box(
+                          modifier = Modifier.fillMaxSize().background(Color.Black)
+                              .pointerInput(Unit) {
+                                  detectTapGestures(onTap = { theaterMode = false })
+                              }
+                      ) {
                           VideoFullscreen(deckA, deckB, videoCrossfader)
                       }
                   } else {
-                      Column(modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 6.dp)) {
+                      Column(
+                          modifier = Modifier.fillMaxSize().padding(horizontal = 6.dp, vertical = 4.dp)
+                      ) {
 
-                          Row(modifier = Modifier.fillMaxWidth().height(40.dp),
-                              verticalAlignment = Alignment.CenterVertically) {
+                          Row(
+                              modifier = Modifier.fillMaxWidth().height(38.dp),
+                              verticalAlignment = Alignment.CenterVertically
+                          ) {
                               Column {
-                                  Text("ULTIMATE", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Black, letterSpacing = 6.sp)
-                                  Text("DJ STUDIO", color = Neon.BLUE, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 4.sp)
+                                  Text("ULTIMATE", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black, letterSpacing = 5.sp)
+                                  Text("DJ STUDIO", color = Neon.BLUE, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
                               }
                               Spacer(Modifier.weight(1f))
                               if (isLowEnd) {
                                   TopBtn("LITE", Neon.AMBER, false) {}
-                                  Spacer(Modifier.width(6.dp))
+                                  Spacer(Modifier.width(4.dp))
                               }
                               TopBtn("LAST REC", Neon.BLUE, false) {}
-                              Spacer(Modifier.width(6.dp))
+                              Spacer(Modifier.width(4.dp))
                               TopBtn("SHARE", Neon.GREEN, false) {}
-                              Spacer(Modifier.width(6.dp))
-                              Box(modifier = Modifier.clip(RoundedCornerShape(20.dp))
-                                  .background(if (recording) Neon.RED.copy(alpha = 0.30f) else Neon.RED.copy(alpha = 0.12f))
-                                  .border(1.dp, Neon.RED.copy(alpha = if (recording) 1f else 0.6f), RoundedCornerShape(20.dp))
-                                  .clickable { toggleRecording() }
-                                  .padding(horizontal = 14.dp, vertical = 7.dp)) {
+                              Spacer(Modifier.width(4.dp))
+                              Box(
+                                  modifier = Modifier
+                                      .clip(RoundedCornerShape(20.dp))
+                                      .background(if (recording) Neon.RED.copy(alpha = 0.30f) else Neon.RED.copy(alpha = 0.12f))
+                                      .border(1.dp, Neon.RED.copy(alpha = if (recording) 1f else 0.6f), RoundedCornerShape(20.dp))
+                                      .clickable { toggleRecording() }
+                                      .padding(horizontal = 12.dp, vertical = 6.dp)
+                              ) {
                                   Row(verticalAlignment = Alignment.CenterVertically) {
                                       Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Neon.RED))
-                                      Spacer(Modifier.width(6.dp))
-                                      Text(if (recording) fmt(recordingTime) else "REC",
-                                          color = Neon.RED, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                                      Spacer(Modifier.width(5.dp))
+                                      Text(
+                                          if (recording) fmt(recordingTime) else "REC",
+                                          color = Neon.RED, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp
+                                      )
                                   }
                               }
-                              Spacer(Modifier.width(6.dp))
+                              Spacer(Modifier.width(4.dp))
                               TopBtn("CLUB", Neon.BLUE, false) {}
                           }
 
-                          Spacer(Modifier.height(8.dp))
+                          Spacer(Modifier.height(6.dp))
 
                           VideoBox(deckA, deckB, videoCrossfader)
 
-                          Spacer(Modifier.height(8.dp))
+                          Spacer(Modifier.height(6.dp))
 
-                          DeckStrip(decks = engine.decks, activeA = activeDeckA, activeB = activeDeckB,
+                          DeckStrip(
+                              decks = engine.decks,
+                              activeA = activeDeckA,
+                              activeB = activeDeckB,
                               onSelectA = { idx -> activeDeckA = idx },
-                              onSelectB = { idx -> activeDeckB = idx })
+                              onSelectB = { idx -> activeDeckB = idx }
+                          )
 
-                          Spacer(Modifier.height(8.dp))
+                          Spacer(Modifier.height(6.dp))
 
-                          Row(modifier = Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                          Row(
+                              modifier = Modifier.fillMaxWidth().weight(1f),
+                              horizontalArrangement = Arrangement.spacedBy(6.dp)
+                          ) {
                               DeckPanel(
                                   deck = deckA, accent = accentA, label = "DECK A",
                                   engine = engine, deckIndex = activeDeckA,
@@ -2489,33 +2518,47 @@ jobs:
                               )
                           }
 
-                          Spacer(Modifier.height(8.dp))
+                          Spacer(Modifier.height(6.dp))
 
-                          Row(modifier = Modifier.fillMaxWidth().height(38.dp),
-                              verticalAlignment = Alignment.CenterVertically) {
-                              Box(modifier = Modifier.size(38.dp).clip(RoundedCornerShape(6.dp))
-                                  .background(Neon.BTN_BG)
-                                  .border(0.5.dp, Neon.GREEN.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
-                                  .clickable { openLibrary(activeDeckA) },
-                                  contentAlignment = Alignment.Center) {
+                          Row(
+                              modifier = Modifier.fillMaxWidth().height(34.dp),
+                              verticalAlignment = Alignment.CenterVertically
+                          ) {
+                              Box(
+                                  modifier = Modifier
+                                      .size(34.dp)
+                                      .clip(RoundedCornerShape(6.dp))
+                                      .background(Neon.BTN_BG)
+                                      .border(0.5.dp, Neon.GREEN.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
+                                      .clickable { openLibrary(activeDeckA) },
+                                  contentAlignment = Alignment.Center
+                              ) {
                                   Text("LIB", color = Neon.GREEN, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                               }
-                              Spacer(Modifier.width(8.dp))
-                              Text("A", color = accentA, fontSize = 12.sp, fontWeight = FontWeight.Black)
                               Spacer(Modifier.width(6.dp))
-                              Slider(value = audioCrossfader,
+                              Text("A", color = accentA, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                              Spacer(Modifier.width(4.dp))
+                              Slider(
+                                  value = audioCrossfader,
                                   onValueChange = { v: Float -> audioCrossfader = v; engine.setCrossfader(v) },
-                                  colors = SliderDefaults.colors(thumbColor = Color.White,
+                                  colors = SliderDefaults.colors(
+                                      thumbColor = Color.White,
                                       activeTrackColor = accentA.copy(alpha = 0.8f),
-                                      inactiveTrackColor = accentB.copy(alpha = 0.8f)),
-                                  modifier = Modifier.weight(1f).height(24.dp))
+                                      inactiveTrackColor = accentB.copy(alpha = 0.8f)
+                                  ),
+                                  modifier = Modifier.weight(1f).height(22.dp)
+                              )
+                              Spacer(Modifier.width(4.dp))
+                              Text("B", color = accentB, fontSize = 11.sp, fontWeight = FontWeight.Black)
                               Spacer(Modifier.width(6.dp))
-                              Text("B", color = accentB, fontSize = 12.sp, fontWeight = FontWeight.Black)
-                              Spacer(Modifier.width(8.dp))
-                              Box(modifier = Modifier.size(38.dp).clip(RoundedCornerShape(6.dp))
-                                  .background(Neon.BTN_BG)
-                                  .border(0.5.dp, Neon.TEXT_FAINT.copy(alpha = 0.5f), RoundedCornerShape(6.dp)),
-                                  contentAlignment = Alignment.Center) {
+                              Box(
+                                  modifier = Modifier
+                                      .size(34.dp)
+                                      .clip(RoundedCornerShape(6.dp))
+                                      .background(Neon.BTN_BG)
+                                      .border(0.5.dp, Neon.TEXT_FAINT.copy(alpha = 0.5f), RoundedCornerShape(6.dp)),
+                                  contentAlignment = Alignment.Center
+                              ) {
                                   Text("MIX", color = Neon.TEXT_DIM, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                               }
                           }
@@ -2536,14 +2579,16 @@ jobs:
                                       libraryOpen = false
                                   },
                                   onClose = { libraryOpen = false },
-                                  modifier = Modifier.fillMaxSize().padding(24.dp)
+                                  modifier = Modifier.fillMaxSize().padding(20.dp)
                               )
                           }
                       }
 
                       if (countdown > 0) {
-                          Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.85f)),
-                              contentAlignment = Alignment.Center) {
+                          Box(
+                              modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.85f)),
+                              contentAlignment = Alignment.Center
+                          ) {
                               Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                   Text("Recording starts in", color = Neon.TEXT_DIM, fontSize = 12.sp, letterSpacing = 3.sp)
                                   Spacer(Modifier.height(12.dp))
@@ -2557,21 +2602,49 @@ jobs:
 
           @Composable
           private fun TopBtn(label: String, accent: Color, active: Boolean, onClick: () -> Unit) {
-              Box(modifier = Modifier.clip(RoundedCornerShape(20.dp))
-                  .background(if (active) accent.copy(alpha = 0.25f) else accent.copy(alpha = 0.10f))
-                  .border(1.dp, accent.copy(alpha = if (active) 1f else 0.6f), RoundedCornerShape(20.dp))
-                  .clickable { onClick() }
-                  .padding(horizontal = 14.dp, vertical = 7.dp)) {
+              Box(
+                  modifier = Modifier
+                      .clip(RoundedCornerShape(20.dp))
+                      .background(if (active) accent.copy(alpha = 0.25f) else accent.copy(alpha = 0.10f))
+                      .border(1.dp, accent.copy(alpha = if (active) 1f else 0.6f), RoundedCornerShape(20.dp))
+                      .clickable { onClick() }
+                      .padding(horizontal = 12.dp, vertical = 6.dp)
+              ) {
                   Text(label, color = accent, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
               }
           }
 
           @Composable
+          private fun SmallBtn(
+              label: String,
+              accent: Color,
+              active: Boolean = false,
+              onClick: () -> Unit,
+              modifier: Modifier = Modifier
+          ) {
+              Box(
+                  modifier = modifier
+                      .clip(RoundedCornerShape(4.dp))
+                      .background(if (active) accent.copy(alpha = 0.30f) else Neon.BTN_BG)
+                      .border(0.5.dp, accent.copy(alpha = if (active) 1f else 0.35f), RoundedCornerShape(4.dp))
+                      .clickable { onClick() }
+                      .padding(vertical = 5.dp),
+                  contentAlignment = Alignment.Center
+              ) {
+                  Text(label, color = accent, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+              }
+          }
+
+          @Composable
           private fun VideoBox(deckA: DeckPlayer, deckB: DeckPlayer, videoCrossfader: Float) {
-              Box(modifier = Modifier.fillMaxWidth().height(200.dp)
-                  .clip(RoundedCornerShape(8.dp))
-                  .background(Color.Black)
-                  .border(1.dp, Neon.BORDER_SOFT, RoundedCornerShape(8.dp))) {
+              Box(
+                  modifier = Modifier
+                      .fillMaxWidth()
+                      .height(160.dp)
+                      .clip(RoundedCornerShape(8.dp))
+                      .background(Color.Black)
+                      .border(1.dp, Neon.BORDER_SOFT, RoundedCornerShape(8.dp))
+              ) {
                   VideoContents(deckA, deckB, videoCrossfader)
               }
           }
@@ -2584,7 +2657,9 @@ jobs:
           }
 
           @Composable
-          private fun VideoContents(deckA: DeckPlayer, deckB: DeckPlayer, videoCrossfader: Float) {
+          private fun androidx.compose.foundation.layout.BoxScope.VideoContents(
+              deckA: DeckPlayer, deckB: DeckPlayer, videoCrossfader: Float
+          ) {
               if (deckA.hasVideo) {
                   VideoDeckView(deckA, videoCrossfader, false, VideoTransition.CROSSFADE, Neon.BLUE, false, Modifier.fillMaxSize())
               } else if (deckA.isLoaded) {
@@ -2593,30 +2668,46 @@ jobs:
               if (deckB.hasVideo) {
                   VideoDeckView(deckB, videoCrossfader, true, VideoTransition.CROSSFADE, Neon.AMBER, false, Modifier.fillMaxSize())
               } else if (deckB.isLoaded) {
-                  Box(modifier = Modifier.fillMaxSize().graphicsLayer { alpha = (1f - videoCrossfader).coerceIn(0f, 1f) }) {
+                  Box(
+                      modifier = Modifier.fillMaxSize().graphicsLayer {
+                          alpha = (1f - videoCrossfader).coerceIn(0f, 1f)
+                      }
+                  ) {
                       AudioVisualizer(Neon.AMBER, deckB.isPlaying, deckB.loadedName, deckB.waveform, Modifier.fillMaxSize())
                   }
               }
               if (!deckA.isLoaded && !deckB.isLoaded) {
                   Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                       Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                          Text("LOAD A VIDEO OR AUDIO", color = Neon.BLUE, fontSize = 16.sp,
-                              fontWeight = FontWeight.Black, letterSpacing = 4.sp)
-                          Spacer(Modifier.height(6.dp))
-                          Text("Drag & drop or select from media library to start mixing",
-                              color = Neon.TEXT_FAINT, fontSize = 10.sp, letterSpacing = 1.sp)
+                          Text(
+                              "LOAD A VIDEO OR AUDIO", color = Neon.BLUE, fontSize = 14.sp,
+                              fontWeight = FontWeight.Black, letterSpacing = 4.sp
+                          )
+                          Spacer(Modifier.height(4.dp))
+                          Text(
+                              "Drag & drop or select from media library to start mixing",
+                              color = Neon.TEXT_FAINT, fontSize = 9.sp, letterSpacing = 1.sp
+                          )
                       }
                   }
               }
-              Box(modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
-                  .clip(RoundedCornerShape(20.dp)).background(Neon.BLUE.copy(alpha = 0.15f))
-                  .border(1.dp, Neon.BLUE.copy(alpha = 0.7f), RoundedCornerShape(20.dp))
-                  .padding(horizontal = 12.dp, vertical = 4.dp)) {
-                  Text("MIX", color = Neon.BLUE, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
+              Box(
+                  modifier = Modifier
+                      .align(Alignment.TopStart)
+                      .padding(6.dp)
+                      .clip(RoundedCornerShape(20.dp))
+                      .background(Neon.BLUE.copy(alpha = 0.15f))
+                      .border(1.dp, Neon.BLUE.copy(alpha = 0.7f), RoundedCornerShape(20.dp))
+                      .padding(horizontal = 10.dp, vertical = 3.dp)
+              ) {
+                  Text("MIX", color = Neon.BLUE, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
               }
-              Row(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                  Box(modifier = Modifier.size(9.dp).clip(CircleShape).background(if (deckA.isPlaying) Neon.BLUE else Color(0x33FFFFFF)))
-                  Box(modifier = Modifier.size(9.dp).clip(CircleShape).background(if (deckB.isPlaying) Neon.AMBER else Color(0x33FFFFFF)))
+              Row(
+                  modifier = Modifier.align(Alignment.TopEnd).padding(6.dp),
+                  horizontalArrangement = Arrangement.spacedBy(4.dp)
+              ) {
+                  Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(if (deckA.isPlaying) Neon.BLUE else Color(0x33FFFFFF)))
+                  Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(if (deckB.isPlaying) Neon.AMBER else Color(0x33FFFFFF)))
               }
           }
 
@@ -2633,40 +2724,69 @@ jobs:
               var hiVal by remember { mutableFloatStateOf(0f) }
               var midVal by remember { mutableFloatStateOf(0f) }
               var lowVal by remember { mutableFloatStateOf(0f) }
+              var pitchVal by remember { mutableFloatStateOf(1f) }
               val isPlaying = deck.isPlaying
-              LaunchedEffect(deck) { while (true) { positionMs = deck.positionMs(); durationMs = deck.durationMs(); delay(400) } }
 
-              Column(modifier = modifier
-                  .clip(RoundedCornerShape(8.dp))
-                  .background(Neon.PANEL)
-                  .border(0.5.dp, if (isPlaying) accent.copy(alpha = 0.6f) else Neon.BORDER_SOFT, RoundedCornerShape(8.dp))
-                  .padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+              LaunchedEffect(deck) {
+                  while (true) {
+                      positionMs = deck.positionMs()
+                      durationMs = deck.durationMs()
+                      delay(400)
+                  }
+              }
 
-                  Row(modifier = Modifier.fillMaxWidth(),
+              Column(
+                  modifier = modifier
+                      .clip(RoundedCornerShape(8.dp))
+                      .background(Neon.PANEL)
+                      .border(
+                          0.5.dp,
+                          if (isPlaying) accent.copy(alpha = 0.6f) else Neon.BORDER_SOFT,
+                          RoundedCornerShape(8.dp)
+                      )
+                      .padding(6.dp),
+                  verticalArrangement = Arrangement.spacedBy(3.dp)
+              ) {
+
+                  Row(
+                      modifier = Modifier.fillMaxWidth(),
                       horizontalArrangement = Arrangement.SpaceBetween,
-                      verticalAlignment = Alignment.CenterVertically) {
-                      Text(label, color = accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                      Box(modifier = Modifier.clip(RoundedCornerShape(4.dp))
-                          .background(accent.copy(alpha = 0.15f))
-                          .border(1.dp, accent.copy(alpha = 0.7f), RoundedCornerShape(4.dp))
-                          .clickable { onOpenLibrary() }
-                          .padding(horizontal = 12.dp, vertical = 4.dp)) {
-                          Text("LOAD", color = accent, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                      verticalAlignment = Alignment.CenterVertically
+                  ) {
+                      Text(label, color = accent, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                      Box(
+                          modifier = Modifier
+                              .clip(RoundedCornerShape(4.dp))
+                              .background(accent.copy(alpha = 0.15f))
+                              .border(1.dp, accent.copy(alpha = 0.7f), RoundedCornerShape(4.dp))
+                              .clickable { onOpenLibrary() }
+                              .padding(horizontal = 10.dp, vertical = 3.dp)
+                      ) {
+                          Text("LOAD", color = accent, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                       }
                   }
 
-                  Row(modifier = Modifier.fillMaxWidth().weight(1f),
-                      verticalAlignment = Alignment.CenterVertically) {
-                      Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                          MetalJogWheel(accent = accent, size = 110.dp, isPlaying = isPlaying,
+                  Row(
+                      modifier = Modifier.fillMaxWidth().height(70.dp),
+                      verticalAlignment = Alignment.CenterVertically
+                  ) {
+                      Box(
+                          modifier = Modifier.weight(1f).fillMaxHeight(),
+                          contentAlignment = Alignment.Center
+                      ) {
+                          MetalJogWheel(
+                              accent = accent, size = 62.dp, isPlaying = isPlaying,
                               onScratchStart = { engine.beginScratch(deckIndex) },
                               onScratchMove = { dy: Float -> engine.scratchMove(deckIndex, dy) },
-                              onScratchEnd = { engine.endScratch(deckIndex) })
+                              onScratchEnd = { engine.endScratch(deckIndex) }
+                          )
                       }
-                      Column(modifier = Modifier.width(52.dp).fillMaxHeight(),
-                          horizontalAlignment = Alignment.CenterHorizontally) {
-                          Text("VOL", color = Neon.TEXT_FAINT, fontSize = 7.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                          Spacer(Modifier.height(4.dp))
+                      Column(
+                          modifier = Modifier.width(38.dp).fillMaxHeight(),
+                          horizontalAlignment = Alignment.CenterHorizontally
+                      ) {
+                          Text("VOL", color = Neon.TEXT_FAINT, fontSize = 6.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                          Spacer(Modifier.height(2.dp))
                           Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                               VolumeFader(
                                   accent = accent,
@@ -2677,50 +2797,165 @@ jobs:
                       }
                   }
 
-                  Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly,
-                      verticalAlignment = Alignment.CenterVertically) {
-                      KnobSmall("LOW", accent, lowVal, size = 42.dp,
-                          onValueChange = { v: Float -> lowVal = v; onEqChange(v, midVal, hiVal) })
-                      KnobSmall("MID", accent, midVal, size = 42.dp,
-                          onValueChange = { v: Float -> midVal = v; onEqChange(lowVal, v, hiVal) })
-                      KnobSmall("HIGH", accent, hiVal, size = 42.dp,
-                          onValueChange = { v: Float -> hiVal = v; onEqChange(lowVal, midVal, v) })
+                  Row(
+                      modifier = Modifier.fillMaxWidth(),
+                      horizontalArrangement = Arrangement.SpaceEvenly,
+                      verticalAlignment = Alignment.CenterVertically
+                  ) {
+                      KnobSmall(
+                          "LOW", accent, lowVal, size = 30.dp,
+                          onValueChange = { v: Float -> lowVal = v; onEqChange(v, midVal, hiVal) }
+                      )
+                      KnobSmall(
+                          "MID", accent, midVal, size = 30.dp,
+                          onValueChange = { v: Float -> midVal = v; onEqChange(lowVal, v, hiVal) }
+                      )
+                      KnobSmall(
+                          "HIGH", accent, hiVal, size = 30.dp,
+                          onValueChange = { v: Float -> hiVal = v; onEqChange(lowVal, midVal, v) }
+                      )
                   }
 
-                  Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                      Box(modifier = Modifier.weight(1f).clip(RoundedCornerShape(6.dp))
-                          .background(accent.copy(alpha = 0.12f))
-                          .border(1.dp, accent.copy(alpha = 0.7f), RoundedCornerShape(6.dp))
-                          .clickable { onSync() }
-                          .padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
-                          Text("SYNC", color = accent, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                  Row(
+                      modifier = Modifier.fillMaxWidth(),
+                      horizontalArrangement = Arrangement.spacedBy(3.dp)
+                  ) {
+                      SmallBtn(
+                          label = if (isPlaying) "PAUSE" else "PLAY",
+                          accent = accent, active = isPlaying,
+                          onClick = { onPlay() },
+                          modifier = Modifier.weight(1.4f)
+                      )
+                      SmallBtn("SYNC", accent, false, { onSync() }, Modifier.weight(1f))
+                      SmallBtn("CUE", accent, false, { engine.setCue(deckIndex, 0) }, Modifier.weight(1f))
+                  }
+
+                  Row(
+                      modifier = Modifier.fillMaxWidth(),
+                      horizontalArrangement = Arrangement.spacedBy(3.dp)
+                  ) {
+                      for (i in 0..3) {
+                          val has = deck.hasCue(i)
+                          SmallBtn(
+                              label = if (has) "C${i + 1}" else "+${i + 1}",
+                              accent = accent, active = has,
+                              onClick = {
+                                  if (has) engine.jumpCue(deckIndex, i)
+                                  else engine.setCue(deckIndex, i)
+                              },
+                              modifier = Modifier.weight(1f)
+                          )
                       }
-                      Box(modifier = Modifier.weight(1f).clip(RoundedCornerShape(6.dp))
-                          .background(accent.copy(alpha = 0.12f))
-                          .border(1.dp, accent.copy(alpha = 0.7f), RoundedCornerShape(6.dp))
-                          .clickable { engine.setCue(deckIndex, 0) }
-                          .padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
-                          Text("CUE", color = accent, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                  }
+
+                  Row(
+                      modifier = Modifier.fillMaxWidth(),
+                      horizontalArrangement = Arrangement.spacedBy(3.dp)
+                  ) {
+                      for (i in 4..7) {
+                          val has = deck.hasCue(i)
+                          SmallBtn(
+                              label = if (has) "C${i + 1}" else "+${i + 1}",
+                              accent = accent, active = has,
+                              onClick = {
+                                  if (has) engine.jumpCue(deckIndex, i)
+                                  else engine.setCue(deckIndex, i)
+                              },
+                              modifier = Modifier.weight(1f)
+                          )
                       }
                   }
 
-                  Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp))
-                      .background(if (isPlaying) accent.copy(alpha = 0.25f) else Neon.BTN_BG)
-                      .border(1.dp, accent.copy(alpha = if (isPlaying) 1f else 0.5f), RoundedCornerShape(6.dp))
-                      .clickable { onPlay() }
-                      .padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
-                      Text(if (isPlaying) "PAUSE" else "PLAY",
-                          color = accent, fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 3.sp)
+                  Row(
+                      modifier = Modifier.fillMaxWidth(),
+                      horizontalArrangement = Arrangement.spacedBy(3.dp)
+                  ) {
+                      for (b in intArrayOf(1, 2, 4, 8, 16)) {
+                          SmallBtn(
+                              label = "$b",
+                              accent = accent,
+                              active = deck.loopActive && deck.loopBeats == b,
+                              onClick = { engine.toggleLoop(deckIndex, b) },
+                              modifier = Modifier.weight(1f)
+                          )
+                      }
                   }
 
-                  Text(if (deck.loadedName.isNotEmpty()) deck.loadedName else "No track loaded",
+                  Row(
+                      modifier = Modifier.fillMaxWidth(),
+                      horizontalArrangement = Arrangement.spacedBy(3.dp)
+                  ) {
+                      SmallBtn("-8", accent, false, { engine.beatJump(deckIndex, -8) }, Modifier.weight(1f))
+                      SmallBtn("-4", accent, false, { engine.beatJump(deckIndex, -4) }, Modifier.weight(1f))
+                      SmallBtn("+4", accent, false, { engine.beatJump(deckIndex, 4) }, Modifier.weight(1f))
+                      SmallBtn("+8", accent, false, { engine.beatJump(deckIndex, 8) }, Modifier.weight(1f))
+                  }
+
+                  Row(
+                      modifier = Modifier.fillMaxWidth(),
+                      horizontalArrangement = Arrangement.spacedBy(3.dp)
+                  ) {
+                      SmallBtn(
+                          "ROLL", accent, deck.loopRollActive,
+                          {
+                              if (deck.loopRollActive) engine.stopLoopRoll(deckIndex)
+                              else engine.loopRoll(deckIndex, 1)
+                          },
+                          Modifier.weight(1f)
+                      )
+                      SmallBtn(
+                          "CENS", accent, deck.censorActive,
+                          { engine.censor(deckIndex, 4) },
+                          Modifier.weight(1f)
+                      )
+                      SmallBtn("SPIN", accent, false, { engine.spinback(deckIndex) }, Modifier.weight(1f))
+                      SmallBtn("BRK", accent, false, { engine.brake(deckIndex) }, Modifier.weight(1f))
+                      SmallBtn("SLIP", accent, deck.slipMode, { engine.toggleSlip(deckIndex) }, Modifier.weight(1f))
+                  }
+
+                  Row(
+                      modifier = Modifier.fillMaxWidth(),
+                      horizontalArrangement = Arrangement.spacedBy(4.dp),
+                      verticalAlignment = Alignment.CenterVertically
+                  ) {
+                      Text("PITCH", color = Neon.TEXT_FAINT, fontSize = 6.sp, fontWeight = FontWeight.Bold)
+                      Slider(
+                          value = pitchVal,
+                          onValueChange = { v: Float -> pitchVal = v; engine.setSpeed(deckIndex, v) },
+                          valueRange = 0.5f..1.5f,
+                          colors = SliderDefaults.colors(
+                              thumbColor = accent,
+                              activeTrackColor = accent.copy(alpha = 0.6f),
+                              inactiveTrackColor = Neon.BORDER_SOFT
+                          ),
+                          modifier = Modifier.weight(1f).height(14.dp)
+                      )
+                      Text(
+                          "${"%.2f".format(pitchVal)}x",
+                          color = accent, fontSize = 7.sp, fontWeight = FontWeight.Bold,
+                          modifier = Modifier.width(30.dp)
+                      )
+                  }
+
+                  Text(
+                      if (deck.loadedName.isNotEmpty()) deck.loadedName else "No track loaded",
                       color = if (deck.isLoaded) Neon.TEXT else Neon.TEXT_FAINT,
-                      fontSize = 10.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                  Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                      Text("${fmt(positionMs)} / ${fmt(durationMs)}",
-                          color = Neon.TEXT_DIM, fontSize = 9.sp, fontWeight = FontWeight.Medium)
-                      Text("${"%.0f".format(deck.bpm)} BPM",
-                          color = accent, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                      fontSize = 9.sp, fontWeight = FontWeight.Medium,
+                      maxLines = 1, overflow = TextOverflow.Ellipsis
+                  )
+
+                  Row(
+                      modifier = Modifier.fillMaxWidth(),
+                      horizontalArrangement = Arrangement.SpaceBetween
+                  ) {
+                      Text(
+                          "${fmt(positionMs)} / ${fmt(durationMs)}",
+                          color = Neon.TEXT_DIM, fontSize = 8.sp, fontWeight = FontWeight.Medium
+                      )
+                      Text(
+                          "${"%.0f".format(deck.bpm)} BPM",
+                          color = accent, fontSize = 8.sp, fontWeight = FontWeight.Bold
+                      )
                   }
               }
           }
@@ -2772,5 +3007,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git diff --cached --quiet || git commit -m "ULTIMATE v7.1: fixed VolumeFader/KnobSmall lambda types, VideoStrip removed weight"
+          git diff --cached --quiet || git commit -m "ULTIMATE v10.0: Phase 1 - hot cues, loops, beat jump, loop roll, censor, spinback, brake, slip, pitch"
           git push || echo "push failed"
