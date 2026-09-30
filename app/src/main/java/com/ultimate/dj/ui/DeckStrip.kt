@@ -20,48 +20,38 @@ fun DeckStrip(
     decks: List<DeckPlayer>,
     activeA: Int,
     activeB: Int,
-    onSelect: (Int) -> Unit,
-    onLoadInto: (Int) -> Unit,
+    onSelectA: (Int) -> Unit,
+    onSelectB: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(modifier = modifier.fillMaxWidth().height(40.dp),
+    Row(modifier = modifier.fillMaxWidth().height(32.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         decks.forEachIndexed { idx, deck ->
             val accent = Neon.DECK_COLORS[idx % Neon.DECK_COLORS.size]
             val isA = idx == activeA; val isB = idx == activeB
-            val loaded = deck.isLoaded
+            val active = isA || isB
             Box(
                 modifier = Modifier.weight(1f).fillMaxHeight()
                     .clip(RoundedCornerShape(4.dp))
-                    .background(
-                        when {
-                            !loaded -> Color(0x08FFFFFF)
-                            isA || isB -> accent.copy(alpha = 0.20f)
-                            else -> Neon.PANEL
-                        }
-                    )
+                    .background(if (active) accent.copy(alpha = 0.25f) else Neon.PANEL)
                     .border(
-                        width = if (isA || isB) 1.dp else 0.5.dp,
-                        color = when {
-                            !loaded -> Color(0x15FFFFFF)
-                            isA || isB -> accent
-                            else -> Color(0x20FFFFFF)
-                        },
+                        width = if (active) 1.dp else 0.5.dp,
+                        color = if (active) accent else Neon.BORDER_SOFT,
                         shape = RoundedCornerShape(4.dp)
                     )
-                    .clickable { if (loaded) onSelect(idx) else onLoadInto(idx) },
+                    .clickable {
+                        if (isB) onSelectB(idx) else onSelectA(idx)
+                    },
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("D${idx + 1}",
-                        color = if (loaded) accent else Color(0x40FFFFFF),
-                        fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
-                    if (loaded) {
-                        Text(if (isA) "A" else if (isB) "B" else "•",
-                            color = if (isA || isB) Color.White else accent.copy(alpha = 0.5f),
-                            fontSize = 7.sp, fontWeight = FontWeight.Black)
-                    } else {
-                        Text("+", color = Color(0x33FFFFFF), fontSize = 11.sp, fontWeight = FontWeight.Light)
+                        color = if (active) Color.White else Neon.TEXT_DIM,
+                        fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    if (active) {
+                        Spacer(Modifier.width(3.dp))
+                        Text(if (isA) "A" else "B",
+                            color = accent, fontSize = 8.sp, fontWeight = FontWeight.Black)
                     }
                 }
             }

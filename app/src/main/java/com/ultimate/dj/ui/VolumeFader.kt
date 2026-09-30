@@ -19,22 +19,27 @@ import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 @Composable
-fun VolumeFader(accent: Color, initialValue: Float = 0.75f, onValueChange: (Float) -> Unit = {}, modifier: Modifier = Modifier) {
+fun VolumeFader(
+    accent: Color,
+    initialValue: Float = 0.75f,
+    onValueChange: (Float) -> Unit = {},
+    modifier: Modifier = Modifier
+) {
     var value by remember { mutableFloatStateOf(initialValue) }
-    Box(modifier = modifier.width(26.dp).fillMaxHeight().pointerInput(Unit) {
+    Box(modifier = modifier.width(24.dp).fillMaxHeight().pointerInput(Unit) {
         detectDragGestures { change: PointerInputChange, drag: Offset ->
             change.consume()
             value = (value + (-drag.y / size.height)).coerceIn(0f, 1f)
             onValueChange(value)
         }
     }) {
-        Canvas(modifier = Modifier.fillMaxHeight().width(26.dp)) {
+        Canvas(modifier = Modifier.fillMaxHeight().width(24.dp)) {
             val cx = size.width / 2f; val h = size.height
-            drawLine(Color(0xFF25252E), Offset(cx, 8f), Offset(cx, h - 8f), 2f, StrokeCap.Round)
-            val y = h - value * (h - 16f) - 8f
-            drawLine(accent.copy(alpha = 0.55f), Offset(cx, h - 8f), Offset(cx, y), 2f, StrokeCap.Round)
-            drawRoundRect(accent.copy(alpha = 0.95f), Offset(cx - 11f, y - 5f), Size(22f, 10f), CornerRadius(2f))
-            drawRoundRect(Color(0x50000000), Offset(cx - 11f, y - 5f), Size(22f, 10f), CornerRadius(2f))
+            drawLine(Color(0xFF25252E), Offset(cx, 6f), Offset(cx, h - 6f), 2f, StrokeCap.Round)
+            val y = h - value * (h - 12f) - 6f
+            drawLine(accent.copy(alpha = 0.55f), Offset(cx, h - 6f), Offset(cx, y), 2f, StrokeCap.Round)
+            drawRoundRect(accent.copy(alpha = 0.95f), Offset(cx - 10f, y - 4f), Size(20f, 8f), CornerRadius(2f))
+            drawRoundRect(Color(0x50000000), Offset(cx - 10f, y - 4f), Size(20f, 8f), CornerRadius(2f))
         }
     }
 }

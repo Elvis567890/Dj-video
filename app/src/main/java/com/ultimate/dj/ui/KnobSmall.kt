@@ -25,10 +25,16 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.cos
 import kotlin.math.sin
 @Composable
-fun KnobSmall(label: String, accent: Color, initialValue: Float = 0f,
-              minValue: Float = -26f, maxValue: Float = 6f,
-              size: androidx.compose.ui.unit.Dp = 36.dp,
-              onValueChange: (Float) -> Unit = {}, modifier: Modifier = Modifier) {
+fun KnobSmall(
+    label: String,
+    accent: Color,
+    initialValue: Float = 0f,
+    minValue: Float = -26f,
+    maxValue: Float = 6f,
+    size: androidx.compose.ui.unit.Dp = 30.dp,
+    onValueChange: (Float) -> Unit = {},
+    modifier: Modifier = Modifier
+) {
     var value by remember { mutableFloatStateOf(initialValue) }
     Box(modifier = modifier.size(size).pointerInput(Unit) {
         detectDragGestures { change: PointerInputChange, drag: Offset ->
@@ -49,9 +55,9 @@ fun KnobSmall(label: String, accent: Color, initialValue: Float = 0f,
             val n = ((value - minValue) / range).coerceIn(0f, 1f)
             drawArc(accent, start, sweep * n, false, Offset(cx - r, cy - r), Size(r * 2, r * 2), style = Stroke(2f, cap = StrokeCap.Round))
             val aRad = Math.toRadians((start + sweep * n).toDouble())
-            drawLine(Color.White.copy(alpha = 0.9f), Offset(cx, cy), Offset(cx + (r - 5f) * cos(aRad).toFloat(), cy + (r - 5f) * sin(aRad).toFloat()), 1.5f, StrokeCap.Round)
-            drawCircle(Color(0xFF0A0A0F), 2.5f, Offset(cx, cy))
+            drawLine(Color.White.copy(alpha = 0.9f), Offset(cx, cy), Offset(cx + (r - 4f) * cos(aRad).toFloat(), cy + (r - 4f) * sin(aRad).toFloat()), 1.5f, StrokeCap.Round)
+            drawCircle(Color(0xFF0A0A0F), 2f, Offset(cx, cy))
         }
-        Text(label, color = accent.copy(alpha = 0.85f), fontSize = 6.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.BottomCenter))
+        Text(label, color = accent.copy(alpha = 0.85f), fontSize = 5.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.BottomCenter))
     }
 }

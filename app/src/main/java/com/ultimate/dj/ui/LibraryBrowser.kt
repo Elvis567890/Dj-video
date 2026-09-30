@@ -46,7 +46,6 @@ fun LibraryBrowser(
         .background(Neon.PANEL_GLASS)
         .border(0.5.dp, Neon.BLUE.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
         .padding(12.dp)) {
-
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically) {
             Text("LIBRARY", color = Neon.BLUE, fontSize = 12.sp,
@@ -65,16 +64,13 @@ fun LibraryBrowser(
                 Text("CLOSE", color = Neon.TEXT_DIM, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
             }
         }
-
         OutlinedTextField(
             value = query, onValueChange = { query = it },
             placeholder = { Text("Search title or artist...", color = Neon.TEXT_FAINT, fontSize = 10.sp) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth().height(46.dp)
         )
-
         Spacer(Modifier.height(6.dp))
-
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             for (f in FILTERS) {
                 val sel = f == filter
@@ -88,19 +84,7 @@ fun LibraryBrowser(
                 }
             }
         }
-
         Spacer(Modifier.height(6.dp))
-
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp)) {
-            Text("TITLE", color = Neon.TEXT_FAINT, fontSize = 7.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, modifier = Modifier.weight(2.2f))
-            Text("ARTIST", color = Neon.TEXT_FAINT, fontSize = 7.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, modifier = Modifier.weight(1.4f))
-            Text("BPM", color = Neon.TEXT_FAINT, fontSize = 7.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, modifier = Modifier.width(44.dp))
-            Text("KEY", color = Neon.TEXT_FAINT, fontSize = 7.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, modifier = Modifier.width(36.dp))
-            Text("TIME", color = Neon.TEXT_FAINT, fontSize = 7.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, modifier = Modifier.width(44.dp))
-        }
-
-        Box(modifier = Modifier.fillMaxWidth().height(0.5.dp).background(Neon.BORDER_SOFT))
-
         if (tracks.isEmpty()) {
             Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 Text("No tracks found.\nGrant storage permission and add music/videos.",
@@ -113,32 +97,28 @@ fun LibraryBrowser(
                     Row(modifier = Modifier.fillMaxWidth()
                         .background(if (isSel) Neon.BLUE.copy(alpha = 0.12f) else Color.Transparent)
                         .clickable { selected = track }
-                        .padding(vertical = 6.dp, horizontal = 4.dp),
+                        .padding(vertical = 8.dp, horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically) {
-                        Box(modifier = Modifier.size(20.dp).clip(RoundedCornerShape(3.dp))
+                        Box(modifier = Modifier.size(22.dp).clip(RoundedCornerShape(3.dp))
                             .background(if (track.isVideo) Neon.AMBER.copy(alpha = 0.18f) else Neon.BLUE.copy(alpha = 0.18f))
                             .border(0.5.dp, if (track.isVideo) Neon.AMBER.copy(alpha = 0.7f) else Neon.BLUE.copy(alpha = 0.7f), RoundedCornerShape(3.dp)),
                             contentAlignment = Alignment.Center) {
                             Text(if (track.isVideo) "V" else "♪",
                                 color = if (track.isVideo) Neon.AMBER else Neon.BLUE,
-                                fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
-                        Spacer(Modifier.width(6.dp))
-                        Text(track.title.take(45), color = Neon.TEXT, fontSize = 10.sp,
-                            fontWeight = FontWeight.Medium, modifier = Modifier.weight(2.2f), maxLines = 1)
-                        Text(track.artist.take(20), color = Neon.TEXT_DIM, fontSize = 9.sp,
-                            modifier = Modifier.weight(1.4f), maxLines = 1)
-                        Text(if (track.bpm > 0) "%.0f".format(track.bpm) else "—",
-                            color = Neon.TEXT_DIM, fontSize = 9.sp, modifier = Modifier.width(44.dp))
-                        Text(if (track.key.isNotEmpty()) track.key else "—",
-                            color = Neon.TEXT_DIM, fontSize = 9.sp, modifier = Modifier.width(36.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(track.title.take(60), color = Neon.TEXT, fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+                            Text(track.artist.take(30), color = Neon.TEXT_DIM, fontSize = 9.sp, maxLines = 1)
+                        }
+                        Spacer(Modifier.width(8.dp))
                         Text("${track.durationMs / 1000 / 60}:${"%02d".format((track.durationMs / 1000) % 60)}",
-                            color = Neon.TEXT_DIM, fontSize = 9.sp, modifier = Modifier.width(44.dp))
+                            color = Neon.TEXT_DIM, fontSize = 9.sp)
                     }
                 }
             }
         }
-
         if (selected != null) {
             Spacer(Modifier.height(8.dp))
             Row(modifier = Modifier.fillMaxWidth()
